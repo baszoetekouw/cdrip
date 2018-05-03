@@ -1,0 +1,13 @@
+#!/bin/sh
+file=test_short.wav
+accuraterip-checksum --accuraterip-v1 test_short.wav 3 5
+accuraterip-checksum --accuraterip-v1 test_short.wav 1 5
+accuraterip-checksum --accuraterip-v1 test_short.wav 5 5
+accuraterip-checksum --accuraterip-v1 test_short.wav 1 1
+
+echo "\n====\n\n";
+
+accuraterip-checksum --accuraterip-v2 test_short.wav 3 5
+accuraterip-checksum --accuraterip-v2 test_short.wav 1 5
+accuraterip-checksum --accuraterip-v2 test_short.wav 5 5
+accuraterip-checksum --accuraterip-v2 test_short.wav 1 1
