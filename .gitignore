@@ -1,2 +1,7 @@
 .idea
 env
+venv
+*.o
+accuraterip/accuraterip
+accuraterip/test.*
+accuraterip/test_*
