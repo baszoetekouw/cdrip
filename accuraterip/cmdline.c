@@ -11,8 +11,8 @@
 
 typedef struct {
 	const char * filename;
-	size_t sample_start;
-	size_t sample_length;
+	int64_t sample_start;
+	int64_t sample_length;
 } opts_t;
 
 #define N 255
@@ -115,7 +115,7 @@ opts_t parse_args(const int argc, const char * argv[])
 		char buff[N];
 		strncpy(buff,argv[2],N-1);
 		opts.sample_start = parse_time(buff,N);
-		printf("start sample: '%zu'\n",opts.sample_start);
+		printf("start sample: '%li'\n",opts.sample_start);
 	}
 
 	if (argc>3)
@@ -123,7 +123,7 @@ opts_t parse_args(const int argc, const char * argv[])
 		char buff[N];
 		strncpy(buff,argv[2],N-1);
 		opts.sample_length = parse_time(argv[3],N);
-		printf("length sample: '%zu'\n",opts.sample_length);
+		printf("length sample: '%li'\n",opts.sample_length);
 	}
 
 	return opts;
