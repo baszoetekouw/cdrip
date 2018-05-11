@@ -1,15 +1,15 @@
 CFLAGS+=-Wall -Wextra -Werror
 CFLAGS+=--std=c99
 CFLAGS+=-O3
-#CFLAGS+=-ggdb3
-#CFLAGS+=-fstack-check
+CFLAGS+=-ggdb3
+CFLAGS+=-fstack-check
 
 
 OBJS=accuraterip.o cmdline.o
 LIBS+=-lsndfile
 
 .PHONY: all
-all: accuraterip
+all: accuraterip test_short.wav
 
 .PHONY: clean
 clean:
