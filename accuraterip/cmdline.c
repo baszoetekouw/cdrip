@@ -1,26 +1,144 @@
+/* for strtol */
+#define _ISOC99_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <malloc.h>
 #include <errno.h>
 #include <sndfile.h>
 
 #include "accuraterip.h"
 
+typedef struct {
+	const char * filename;
+	size_t sample_start;
+	size_t sample_length;
+} opts_t;
+
+#define N 255
+
+
+int help(const char * const error)
+{
+	if (error!=NULL)
+	{
+		printf("ERROR: %s\n\n", error);
+	}
+	printf("Syntax: accuraterip <filename.wav> [ start [ length ] ]\n");
+	printf("  start and length can be specified as:\n");
+	printf("  Ns for N samples, or\n");
+	printf("  m:s:f for minutes, seconds and frames\n");
+	printf("  (1 frame  is 1/75 seconds, or 588 samples)\n");
+	exit(1);
+}
+
+size_t parse_time(const char * const time_str, const size_t buff_size)
+{
+	/* We're going to parse a time input string
+	 * These strings can be either in the form "<samples>s" to specifiy a fixed number of samples
+	 * right away, or in the form "[[<min>:]<sec>:]<frames>" to specify minutes, seconds, and frames.
+	 * Note: 4 bytes (16 bits x 2 channels) in a sample, 588 samples in a frame, 75 frames in a second
+	 */
+
+	/* copy the string to a local buffer, to make sure it's NULL-terminated */
+	char buff[buff_size+1];
+	memcpy(buff,time_str,buff_size);
+	buff[buff_size] = '\0';
+
+	/* pointer to current position in buffer */
+	char *p1, *p2, *p3;
+
+	/* fetch first number in the string */
+	long num1 = strtol(buff,&p1,10);
+	if (num1<0)
+	{
+		/* invalid (negative) number was specified */
+		help("Invalid time specification (negative number)");
+	}
+	if (p1==buff)
+	{
+		/* pointer hasn't moved, so there was no number to decode */
+		help("Invalid time specified");
+	}
+
+	/* if the next char is an 's' (or 'S'), assume first number is a number of samples */
+	if (*p1=='s' || *p1=='S')
+	{
+		return num1;
+	}
+
+	/* fetch second number in the string */
+	long num2 = strtol(++p1,&p2,10);
+	if (num2<0)
+	{
+		/* invalid (negative) number was specified */
+		help("Invalid time specification (negative number)");
+	}
+	if (p2==p1)
+	{
+		/* pointer hasn't moved, so there was no number to decode,
+		 * which means num1 is the final answer, and should be interpretated as a number of frames */
+		return num1*SAMPLES_PER_FRAME;
+	}
+
+	/* fetch third number in the string */
+	long num3 = strtol(++p2,&p3,10);
+	if (num3<0)
+	{
+		/* invalid (negative) number was specified */
+		help("Invalid time specification (negative number)");
+	}
+	if (p3==p2)
+	{
+		/* pointer hasn't moved, so there was no number to decode,
+		 * which means num1:num2 is the final answer, and should be interpretated as seconds:frames */
+		return num1*SAMPLES_PER_SECOND + num2*SAMPLES_PER_FRAME;
+	}
+
+	/* otherwise, we got minutes:seconds:frames */
+	return num1*SAMPLES_PER_MINUTE + num2*SAMPLES_PER_SECOND + num3*SAMPLES_PER_FRAME;
+}
+
+opts_t parse_args(const int argc, const char * argv[])
+{
+	opts_t opts = { NULL, -1, -1 };
+
+	if (argc<2) help("Too few arguments");
+	if (argc>4) help("Too many arguments");
+
+	opts.filename = argv[1];
+
+	printf("input filename: '%s'\n",opts.filename);
+
+	if (argc>2)
+	{
+		char buff[N];
+		strncpy(buff,argv[2],N-1);
+		opts.sample_start = parse_time(buff,N);
+		printf("start sample: '%zu'\n",opts.sample_start);
+	}
+
+	if (argc>3)
+	{
+		char buff[N];
+		strncpy(buff,argv[2],N-1);
+		opts.sample_length = parse_time(argv[3],N);
+		printf("length sample: '%zu'\n",opts.sample_length);
+	}
+
+	return opts;
+}
+
 int main(const int argc, const char *argv[])
 {
-	if (argc!=2)
-	{
-		fprintf(stderr,"Please specify filename\n");
-		exit(1);
-	}
-	const char * filename = argv[1];
+	opts_t options = parse_args(argc,argv);
+
 	SF_INFO info;
 	memset(&info,0,sizeof(info));
-	SNDFILE *fd = sf_open(filename, SFM_READ, &info);
+	SNDFILE *fd = sf_open(options.filename, SFM_READ, &info);
 	if (!fd)
 	{
-		fprintf(stderr,"Can't open file '%s': %s",filename,strerror(errno));
+		fprintf(stderr,"Can't open file '%s': %s\n",options.filename,strerror(errno));
 		exit(1);
 	}
 	printf("File opened succesfully.\n");

@@ -1,3 +1,6 @@
+/* for strtol */
+#define _ISOC99_SOURCE
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -6,6 +9,19 @@
 
 #ifndef ACCURATERIP_H
 #define ACCURATERIP_H
+
+#define BYTES_PER_SAMPLE     (4)
+#define SAMPLES_PER_FRAME  (588)
+#define FRAMES_PER_SECOND   (75)
+
+#define BYTES_PER_FRAME    (BYTES_PER_SAMPLE*SAMPLES_PER_FRAME)
+#define BYTES_PER_SECOND   (BYTES_PER_FRAME*FRAMES_PER_SECOND)
+#define BYTES_PER_MINUTE   (60*BYTES_PER_SECOND)
+
+#define SAMPLES_PER_SECOND (SAMPLES_PER_FRAME*FRAMES_PER_SECOND)
+#define SAMPLES_PER_MINUTE (60*SAMPLES_PER_SECOND)
+
+#define FRAME_PER_MINUTE   (60*FRAMES_PER_SECOND)
 
 /* deprecated functions (use accuraterip_checksum() instead)
  * for a little-endian system, each sample is:
