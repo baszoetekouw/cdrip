@@ -101,7 +101,7 @@ size_t parse_time(const char * const time_str, const size_t buff_size)
 
 opts_t parse_args(const int argc, const char * argv[])
 {
-	opts_t opts = { NULL, -1, -1 };
+	opts_t opts = { NULL, 0, -1 };
 
 	if (argc<2) help("Too few arguments");
 	if (argc>4) help("Too many arguments");
@@ -133,6 +133,10 @@ int main(const int argc, const char *argv[])
 {
 	opts_t options = parse_args(argc,argv);
 
+	printf("Source file: '%s'\n", options.filename);
+	printf("Start at sample #: %ld\n", options.sample_start);
+	printf("Read samples: %ld\n", options.sample_length);
+
 	SF_INFO info;
 	memset(&info,0,sizeof(info));
 	SNDFILE *fd = sf_open(options.filename, SFM_READ, &info);
@@ -150,19 +154,34 @@ int main(const int argc, const char *argv[])
 		fprintf(stderr, "This is not a stero PCM16 file\n");
 		exit(1);
 	}
-	size_t num_samples = info.frames * info.channels;
-	size_t buf_size = (num_samples) * sizeof(int16_t);
+
+	/* seek to the starting position */
+	/* Note: seek uses 2-channel samples, so seek of 1 means skip 32 bits */
+	if (sf_seek(fd,options.sample_start,SEEK_SET)<0)
+	{
+		fprintf(stderr, "Error while seeking to sample %ld\n", options.sample_start);
+		exit(1);
+	}
+
+	/* Note: 1 sample consists of 2 16-bit values (left and right channel) */
+	int64_t num_samples;
+	if (options.sample_length>0)
+		num_samples = options.sample_length;
+	else
+		num_samples = info.frames-options.sample_start;
+
+	size_t buf_size = num_samples * info.channels * sizeof(int16_t);
 	int16_t * buf  = malloc(buf_size);
 	memset(buf,0xff,buf_size);
 	printf("buf size: %zu\n", buf_size);
 
-	long num_read = sf_read_short(fd, buf, num_samples);
+	long num_read = sf_read_short(fd, buf, num_samples*info.channels);
 	fprintf(stdout, "read %li samples\n", num_read);
 
 	//for (uint8_t *p = (uint8_t*) buf; p<(uint8_t*)buf+buf_size; p++) printf("%s%02x",((void*)p-(void*)buf)%40==0?"\n":" ",*p);
 	//printf("\n");
 
-	if (num_read!=info.frames*info.channels)
+	if (num_read!=num_samples*info.channels)
 	{
 		fprintf(stderr, "Could read only %li of %li frames\n", num_read, info.frames);
 		exit(1);
@@ -182,10 +201,10 @@ int main(const int argc, const char *argv[])
 	uint32_t crc_v2d = 0;
 	uint32_t crc_v1e = 0;
 	uint32_t crc_v2e = 0;
-	int result1 = accuraterip_checksum(&crc_v1b,&crc_v2b,buf,info.frames,info.channels,false,false);
-	int result2 = accuraterip_checksum(&crc_v1c,&crc_v2c,buf,info.frames,info.channels,true,false);
-	int result3 = accuraterip_checksum(&crc_v1d,&crc_v2d,buf,info.frames,info.channels,false,true);
-	int result4 = accuraterip_checksum(&crc_v1e,&crc_v2e,buf,info.frames,info.channels,true,true);
+	int result1 = accuraterip_checksum(&crc_v1b,&crc_v2b,buf,num_samples,info.channels,false,false);
+	int result2 = accuraterip_checksum(&crc_v1c,&crc_v2c,buf,num_samples,info.channels,true,false);
+	int result3 = accuraterip_checksum(&crc_v1d,&crc_v2d,buf,num_samples,info.channels,false,true);
+	int result4 = accuraterip_checksum(&crc_v1e,&crc_v2e,buf,num_samples,info.channels,true,true);
 	if (result1!=0||result2!=0||result3!=0||result4!=0)
 	{
 		fprintf(stderr,"Error while calculating checksum\n");
