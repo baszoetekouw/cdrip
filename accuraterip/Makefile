@@ -9,17 +9,20 @@ OBJS=accuraterip.o cmdline.o
 LIBS+=-lsndfile
 
 .PHONY: all
-all: accuraterip test_short.wav
+all: accuraterip test/short.wav
 
 .PHONY: clean
 clean:
 	-rm -f $(OBJS) accuraterip
-	-rm -f test_short.wav
+	-rm -f test/short.wav test/full.wav
 
 accuraterip.c: accuraterip.h
 
 accuraterip: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-test_short.wav: test.wav
-	sox $< $@ trim 100 10
+test/full.wav: test/JOHN_MICHEL_CELLO-J_S_BACH_CELLO_SUITE_1_in_G_Minuets.ogg
+	ffmpeg -v error -y -i $< $@
+
+test/short.wav: test/full.wav
+	sox $< $@ trim 30 10

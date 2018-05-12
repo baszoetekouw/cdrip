@@ -1,7 +1,7 @@
 #!/bin/sh
-echo Full file test_short.wav
-./accuraterip test_short.wav      | grep '^checksum '
-echo Partial file test.wav
-./accuraterip test.wav 100:0 10:0 | grep '^checksum '
+echo Full file test/short.wav
+./accuraterip test/short.wav      | grep '^checksum '
+echo Partial file test/full.wav
+./accuraterip test/full.wav 30:0 10:0 | grep '^checksum '
 exit 0
 
