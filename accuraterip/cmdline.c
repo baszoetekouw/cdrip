@@ -151,7 +151,12 @@ int main(const int argc, const char *argv[])
 
 	if ( !(info.format & SF_FORMAT_PCM_16) || !(info.channels==2) )
 	{
-		fprintf(stderr, "This is not a stero PCM16 file\n");
+		fprintf(stderr, "This is not a stereo PCM16 file\n");
+		exit(1);
+	}
+	if ( info.samplerate!=44100 )
+	{
+		fprintf(stderr, "Samplerates other than 44.1kHz are not supported\n");
 		exit(1);
 	}
 
