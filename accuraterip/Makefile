@@ -9,7 +9,10 @@ OBJS=accuraterip.o cmdline.o
 LIBS+=-lsndfile
 
 .PHONY: all
-all: accuraterip test/short.wav
+all: accuraterip
+
+.PHONY: test
+test: test/short.wav
 
 .PHONY: clean
 clean:
