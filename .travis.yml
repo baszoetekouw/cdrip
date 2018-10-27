@@ -1,3 +1,5 @@
+#  vim ft=yaml:expandtab:sw=2:ts=2
+---
 language:
   - c
   - python
@@ -5,6 +7,9 @@ language:
 compiler:
   - clang
   - gcc
+
+install:
+  - apt install libsndfile1-dev
 
 script:
   - "cd accuraterip && make"
