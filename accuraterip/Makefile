@@ -16,8 +16,6 @@ clean:
 	-rm -f $(OBJS) accuraterip
 	-rm -f test/short.wav test/full.wav
 
-accuraterip.c: accuraterip.h
-
 accuraterip: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 

@@ -3,8 +3,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <getopt.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <sndfile.h>
 
 #include "accuraterip.h"
@@ -13,10 +15,11 @@ typedef struct {
 	const char * filename;
 	int64_t sample_start;
 	int64_t sample_length;
+	int is_first_track;
+	int is_last_track;
 } opts_t;
 
 #define N 255
-
 
 int help(const char * const error)
 {
@@ -24,12 +27,23 @@ int help(const char * const error)
 	{
 		printf("ERROR: %s\n\n", error);
 	}
-	printf("Syntax: accuraterip <filename.wav> [ start [ length ] ]\n");
-	printf("  start and length can be specified as:\n");
+	printf("Syntax: accuraterip [options] <filename.wav>\n");
+	printf("\n");
+	printf("Available options:\n");
+	printf("  --first (-f) : track is first on disc (first 5 frames are ignored)\n");
+	printf("  --last (-l)  : track is last on disc (final 5 frames are ignored)\n");
+	printf("  --start <time> (-s) :  start time of track in file (default: start of file)\n");
+	printf("  --len <time> (-n) :  length of track in file (default: from <start> until the end of the file\n");
+	printf("\n");
+	printf("Start and length times can be specififed as:\n");
 	printf("  Ns for N samples, or\n");
 	printf("  m:s:f for minutes, seconds and frames\n");
 	printf("  (1 frame  is 1/75 seconds, or 588 samples)\n");
-	exit(1);
+
+	if (error==NULL)
+		exit(0);
+	else
+		exit(1);
 }
 
 size_t parse_time(const char * const time_str, const size_t buff_size)
@@ -99,9 +113,56 @@ size_t parse_time(const char * const time_str, const size_t buff_size)
 	return num1*SAMPLES_PER_MINUTE + num2*SAMPLES_PER_SECOND + num3*SAMPLES_PER_FRAME;
 }
 
-opts_t parse_args(const int argc, const char * argv[])
+opts_t parse_args(const int argc, char ** argv)
 {
-	opts_t opts = { NULL, 0, -1 };
+	opts_t opts = { NULL, 0, -1, false, false };
+
+	const char * const  short_options  = "hfes:l:";
+	const struct option long_options[] =
+	{
+		{"help",   no_argument,       NULL, 'h'},
+		{"first",  no_argument,       NULL, 'f'},
+		{"last",   no_argument,       NULL, 'l'},
+		{"start",  required_argument, NULL, 's'},
+		{"length", required_argument, NULL, 'n'},
+		{NULL,     0,                 NULL, 0  },
+	};
+
+	while (1)
+	{
+		int opt_idx;
+		char buff[N];
+		char c = getopt_long(argc, argv, short_options, long_options, &opt_idx);
+
+		if (c==-1)
+			break;
+
+		switch (c)
+		{
+			case 'h':
+				break;
+			case 'f':
+				opts.is_first_track = true;
+				break;
+			case 'l':
+				opts.is_last_track = true;
+				break;
+			case 's':
+				strncpy(buff,optarg,N-1);
+				buff[N-1]='\0';
+				opts.sample_start = parse_time(buff,N);
+				break;
+			case 'n':
+				strncpy(buff,optarg,N-1);
+				buff[N-1]='\0';
+				opts.sample_length = parse_time(buff,N);
+				break;
+		}
+	}
+
+	printf("Track type: %sfirst,%slast\n",opts.is_first_track?"":"not ",opts.is_last_track?"":"not ");
+	printf("start sample: '%li'\n",opts.sample_start);
+	printf("number of samples: '%li'\n",opts.sample_length);
 
 	if (argc<2) help("Too few arguments");
 	if (argc>4) help("Too many arguments");
@@ -129,7 +190,7 @@ opts_t parse_args(const int argc, const char * argv[])
 	return opts;
 }
 
-int main(const int argc, const char *argv[])
+int main(const int argc, char **argv)
 {
 	opts_t options = parse_args(argc,argv);
 
@@ -147,7 +208,7 @@ int main(const int argc, const char *argv[])
 	}
 	printf("File opened succesfully.\n");
 	printf("rate: %i, chan: %i, format: 0x%06x, sect: %i, seek: %i, frames: %li\n",
-		info.samplerate, info.channels, info.format, info.sections, info.seekable, info.frames );
+			info.samplerate, info.channels, info.format, info.sections, info.seekable, info.frames );
 
 	if ( !(info.format & SF_FORMAT_PCM_16) || !(info.channels==2) )
 	{
