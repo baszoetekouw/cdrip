@@ -9,7 +9,7 @@ compiler:
   - gcc
 
 install:
-  - apt install libsndfile1-dev
+  - sudo apt install libsndfile1-dev
 
 script:
   - "cd accuraterip && make"
