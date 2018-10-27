@@ -1,0 +1,10 @@
+language:
+  - c
+  - python
+
+compiler:
+  - clang
+  - gcc
+
+script:
+  - "cd accuraterip && make"
