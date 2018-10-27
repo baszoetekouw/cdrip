@@ -10,7 +10,7 @@ compiler:
 
 install:
   - sudo apt update
-  - sudo apt install libvorbis-dev libflac-dev libsndfile1-dev
+  - sudo apt install libsndfile1-dev
 
 script:
   - "cd accuraterip && make"
