@@ -1,8 +1,8 @@
 #!./env/bin/python
 
 import pyudev
-import voidrip.rip
-from pprint import pprint
+import voidrip
+#from pprint import pprint
 
 
 # wait until an audio cd is inserted and return the device name
@@ -37,19 +37,23 @@ def main():
 	#	disc_id  = disc.id
 	#	disc_toc = disc.toc
 
-	disc_toc=None
-	for disc_id in ('2k1hHt5KQPVEiNpm8hIdzqUnYQo-','prJeAorVFSTkgUPo2QKUK_agAIg-','53xaa33729k6Bz5JCNNtRsgydRE-','U_e_qZwjtNytOO9_hW.85msX76U-'):
-		release_info = voidrip.rip.fetch_musicbrainz(disc_id,disc_toc)
-		if not release_info:
-			print("Disc not found or stub found in Musicbrainz")
-			continue
-		#pprint.pprint(disc_info)
-		disc_info = voidrip.rip.parse_release_info(release_info)
-		voidrip.rip.print_disc_info(disc_info)
-		#eject(devicename)
+	ripper = voidrip.Ripper(device='/dev/cdrom',offset=441)
+	ripper.start()
+	return
 
-		print("\n===\n")
-		continue
+	# disc_toc=None
+	# for disc_id in ('2k1hHt5KQPVEiNpm8hIdzqUnYQo-','prJeAorVFSTkgUPo2QKUK_agAIg-','53xaa33729k6Bz5JCNNtRsgydRE-','U_e_qZwjtNytOO9_hW.85msX76U-'):
+	# 	release_info = voidrip.rip.fetch_musicbrainz(disc_id,disc_toc)
+	# 	if not release_info:
+	# 		print("Disc not found or stub found in Musicbrainz")
+	# 		continue
+	# 	#pprint.pprint(disc_info)
+	# 	disc_info = voidrip.rip.parse_release_info(release_info)
+	# 	voidrip.rip.print_disc_info(disc_info)
+	# 	#eject(devicename)
+    #
+	# 	print("\n===\n")
+	# 	continue
 
 main()
 exit(0)
