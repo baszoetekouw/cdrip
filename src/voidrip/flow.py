@@ -3,6 +3,7 @@ import string
 import tempfile
 #from pprint import pprint
 import discid
+from pprint import pprint
 from . import cdplayer
 from . import cd
 from . import audiorip
@@ -11,36 +12,42 @@ from .tools import execcmd
 class CDException(Exception): pass
 
 class VoidRip:
-	def __init__(self,device : string ='/dev/cdrom',offset : int = 0):
+	def __init__(self, device : string ='/dev/cdrom', tmpdir : os.PathLike = None):
 		self._name = 'voidrip'
-		self._cdplayer = cdplayer.CDPlayer(device,offset)
-		self._tempdir = tempfile.TemporaryDirectory(prefix=f'{self._name}_')
-		self._audiorip = audiorip.AudioRip(cd=self._cdplayer)
+		self._cdplayer = cdplayer.CDPlayer(device)
+		self._tmpdirobj = None
+		if tmpdir is None:
+			self._tempdirobj = tempfile.TemporaryDirectory(prefix=f'{self._name}_')
+			self._tempdir = self._tempdirobj.name
+		else:
+			self._tempdir = tmpdir
+		self._audiorip = audiorip.AudioRip(cd=self._cdplayer, destdir=self._tempdir)
 		self._disc = cd.Disc
 
-		pass
+	def get_path(self,filename : str) -> str:
+		return os.path.join(self._tempdir, filename)
 
-	def get_path(self,filename):
-		return os.path.join(self._tempdir.name,filename)
-
-	def start(self):
+	def start(self) -> None:
+		print("Closing tray")
 		self._cdplayer.tray_close()
 		if self._cdplayer.has_disc():
-			self._cdplayer.tray_open()
 			self.fetch_cd_info()
-			self._audiorip.rip_fast_fullcd()
+			#self._audiorip.rip_fast_fullcd()
 			self.correct_offset()
 			self.check_accuraterip()
 			self.fetch_metadata()
+		else:
+			print("No disc detected")
 		self._cdplayer.tray_open()
 
 	def fetch_cd_info(self):
 		# calc cddb id
-		self._disc = discid.read(device=self._cdplayer.device(), features=discid.FEATURES_IMPLEMENTED)
+		self._disc = discid.read(device=self._cdplayer.devicename, features=discid.FEATURES_IMPLEMENTED)
+		pprint(self._disc)
 
 	def correct_offset(self):
-		raw_spec = ['-t raw', '--endian big',    '-b 16', '-e signed', '-c 2', '-r 44100']
-		wav_spec = ['-t wav', '--endian little', '-b 16', '-e signed', '-c 2', '-r 44100']
+		raw_spec = ['-t', 'raw', '--endian', 'big',    '-b16', '-e', 'signed', '-c2', '-r44100']
+		wav_spec = ['-t', 'wav', '--endian', 'little', '-b16', '-e', 'signed', '-c2', '-r44100']
 
 		# calculate offset in seconds
 		# let's just hope the offset is always <60 seconds
@@ -54,7 +61,7 @@ class VoidRip:
 			trim_spec = ['trim',f'{offset_seconds:.6f}']
 		elif self._cdplayer.offset<0:
 			trim_spec = ['trim','0',f'-{offset_seconds:.6f}']
-		execcmd('sox',raw_spec+['cdrdao.raw', '-t wav', 'cdrdao.wav']+trim_spec)
+		execcmd('sox',raw_spec+['cdrdao.raw', '-t', 'wav', 'cdrdao.wav']+trim_spec, cwd=self._tempdir)
 
 		if self._cdplayer.offset==0:
 			# copy wav as-is
@@ -62,17 +69,17 @@ class VoidRip:
 		else:
 			# generate silence
 			execcmd('sox',[
-				'-t','s16','--endian','big', '-c2', '-r44100', '/dev/zero',
+				'-t', 's16', '--endian', 'big', '-c2', '-r44100', '/dev/zero',
 				'stilte.wav',
 				'trim', '0',f'{offset_seconds:.6f}'
-			])
+			], cwd=self._tempdir)
 
 			if self._cdplayer.offset>0:
 				# append silence
-				execcmd('sox',['cdrdao.wav','stilte.wav']+wav_spec+['cd.wav'])
+				execcmd('sox',['cdrdao.wav','stilte.wav']+wav_spec+['cd.wav'], cwd=self._tempdir)
 			else:
 				# prepend silence
-				execcmd('sox',['stilte.wav','cdrdao.wav']+wav_spec+['cd.wav'])
+				execcmd('sox',['stilte.wav','cdrdao.wav']+wav_spec+['cd.wav'], cwd=self._tempdir)
 
 	def check_accuraterip(self):
 		# fetch accuraterip cd

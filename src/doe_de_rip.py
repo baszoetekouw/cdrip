@@ -2,6 +2,7 @@
 
 import pyudev
 import voidrip
+from pathlib import Path
 #from pprint import pprint
 
 
@@ -37,7 +38,7 @@ def main():
 	#	disc_id  = disc.id
 	#	disc_toc = disc.toc
 
-	ripper = voidrip.Ripper(device='/dev/cdrom',offset=441)
+	ripper = voidrip.Ripper(device='/dev/cdrom1', tmpdir=Path('/tmp/cdtest'))
 	ripper.start()
 	return
 

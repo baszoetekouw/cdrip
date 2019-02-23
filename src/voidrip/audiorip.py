@@ -17,8 +17,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-import tempfile
-import os
 import tocparser
 from os import PathLike
 from typing import Union
@@ -26,23 +24,37 @@ from pathlib import Path
 
 from . import cdplayer
 from . import tools
+from .cd import Disc
 
 
 # this class handles the actual ripping from cd to audio file
 
 class AudioRip:
-	def __init__(self,cd : cdplayer.CDPlayer,tmpdir: tempfile.TemporaryDirectory=None):
-		self._cd: cdplayer.CDPlayer = cd
-		self._tmpdir: tempfile.TemporaryDirectory = tmpdir
-		self._commands = {
-			'cdrdao':     '/usr/bin/cdrdao',
-			'cdparanoia': '/usr/bin/cdparano1ia',
-			'sox':        '/usr/bin/sox',
-		}
-		pass
+	COMMANDS = {
+		'cdrdao': '/usr/bin/cdrdao',
+		'cdparanoia': '/usr/bin/cdparano1ia',
+		'sox': '/usr/bin/sox',
+	}
 
-	def path(self, name: Union[PathLike,str]):
-		return os.path.join(self._tmpdir.name,[name])
+	def __init__(self, cd : cdplayer.CDPlayer, destdir: PathLike) -> None:
+		self._cdplayer: cdplayer.CDPlayer = cd
+		self._destdir: PathLike = destdir
+		self._disc : Disc = Disc()
+
+	@property
+	def cd(self):
+		return self._cdplayer
+
+	@property
+	def disc(self):
+		return self._disc
+
+	@property
+	def cwd(self):
+		return self._destdir
+
+	def path(self, name: Union[PathLike,str]) -> Path:
+		return Path(self._destdir, name)
 
 	def rip(self,output):
 		# https://github.com/thomasvs/morituri/blob/master/examples/readdisc.py./con
@@ -52,16 +64,16 @@ class AudioRip:
 		# cdrdao
 		tools.execcmd(
 			cmd='cdrdao',
-			args=['read_cd', '--datafile', 'cdrdao.raw', '--device', self._cd.device(), 'cdrdao.toc'],
-			cwd=self._tmpdir
+			args=['read-cd', '--datafile', 'cdrdao.raw', '--device', self.cd.devicename, 'cdrdao.toc'],
+			cwd=self.cwd
 		)
-		toc = tocparser.TOC.load(self.path('cdrdao.toc'))
-		print(toc)
+		self.disc.rawfile = self.path('cdrdao.raw')
+		self.disc.toc = tocparser.TOC.load(self.path('cdrdao.toc'))
 
 	def rip_accurate_track(self, track: int) -> PathLike:
 		# cdparanoia
 		outputfile = Path(f'cdparanoia_{track:02d}.wav')
-		tools.execcmd('cdparanoia', ['--output-wav', '--force-cdrom-device', self._cd.device(), '--sample-offset',
-		                         f'{self._cd.offset():d}', f'{track:d}', outputfile])
+		tools.execcmd('cdparanoia', ['--output-wav', '--force-cdrom-device', self.cd.devicename, '--sample-offset',
+		                         f'{self.cd.offset:d}', f'{track:d}', outputfile])
 		return outputfile
 
