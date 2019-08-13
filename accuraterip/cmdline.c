@@ -15,11 +15,15 @@ typedef struct {
 	const char * filename;
 	int64_t sample_start;
 	int64_t sample_length;
-	int is_first_track;
-	int is_last_track;
+	bool is_first_track;
+	bool is_last_track;
+	bool test;
 } opts_t;
 
 #define N 255
+
+static bool VERBOSE = false;
+#define debug(a...) { if (VERBOSE) printf(a); }
 
 int help(const char * const error)
 {
@@ -27,17 +31,20 @@ int help(const char * const error)
 	{
 		printf("ERROR: %s\n\n", error);
 	}
-	printf("Syntax: accuraterip [options] <filename.wav>\n");
+	printf("Syntax: accuraterip [-v] [-f] [-l] <filename.wav> [<start> [<length>]]\n");
 	printf("\n");
 	printf("Available options:\n");
-	printf("  --first (-f) : track is first on disc (first 5 frames are ignored)\n");
-	printf("  --last (-l)  : track is last on disc (final 5 frames are ignored)\n");
-	printf("  --start <time> (-s) :  start time of track in file (default: start of file)\n");
-	printf("  --len <time> (-n) :  length of track in file (default: from <start> until the end of the file\n");
+	printf("  --first (-f)   : track is first on disc (first 5 frames are ignored)\n");
+	printf("  --last (-l)    : track is last on disc (final 5 frames are ignored)\n");
+	printf("  --test (-t)    : show lots of test output (different variations of checksums)\n");
+	printf("  --verbose (-v) : show verbose output\n");
+	printf("\n");
+	printf("<start>  :  start time of track in file (default: start of file)\n");
+	printf("<length> :  length of track in file (default: from <start> until the end of the file\n");
 	printf("\n");
 	printf("Start and length times can be specififed as:\n");
 	printf("  Ns for N samples, or\n");
-	printf("  m:s:f for minutes, seconds and frames\n");
+	printf("  [[m:]s:]f for minutes, seconds and frames\n");
 	printf("  (1 frame  is 1/75 seconds, or 588 samples)\n");
 
 	if (error==NULL)
@@ -113,19 +120,20 @@ size_t parse_time(const char * const time_str, const size_t buff_size)
 	return num1*SAMPLES_PER_MINUTE + num2*SAMPLES_PER_SECOND + num3*SAMPLES_PER_FRAME;
 }
 
+
 opts_t parse_args(const int argc, char ** argv)
 {
-	opts_t opts = { NULL, 0, -1, false, false };
+	opts_t opts = { NULL, 0, -1, false, false, false };
 
-	const char * const  short_options  = "hfes:l:";
+	const char * const  short_options  = "hflvt";
 	const struct option long_options[] =
 	{
-		{"help",   no_argument,       NULL, 'h'},
-		{"first",  no_argument,       NULL, 'f'},
-		{"last",   no_argument,       NULL, 'l'},
-		{"start",  required_argument, NULL, 's'},
-		{"length", required_argument, NULL, 'n'},
-		{NULL,     0,                 NULL, 0  },
+		{"help",    no_argument, NULL, 'h'},
+		{"verbose", no_argument, NULL, 'v'},
+		{"test",    no_argument, NULL, 't'},
+		{"first",   no_argument, NULL, 'f'},
+		{"last",    no_argument, NULL, 'l'},
+		{NULL,      0,           NULL, 0  },
 	};
 
 	while (1)
@@ -133,6 +141,7 @@ opts_t parse_args(const int argc, char ** argv)
 		int opt_idx;
 		char buff[N];
 		char c = getopt_long(argc, argv, short_options, long_options, &opt_idx);
+		opterr = 0; /* don't print error messages */
 
 		if (c==-1)
 			break;
@@ -140,6 +149,17 @@ opts_t parse_args(const int argc, char ** argv)
 		switch (c)
 		{
 			case 'h':
+				help(NULL);
+				assert(0); /* never reached */
+			case '?':
+				snprintf(buff, N, "Invalid option '-%c'", optopt);
+				help(buff);
+				assert(0); /* never reached */
+			case 'v':
+				VERBOSE = true;
+				break;
+			case 't':
+				opts.test = true;
 				break;
 			case 'f':
 				opts.is_first_track = true;
@@ -147,45 +167,33 @@ opts_t parse_args(const int argc, char ** argv)
 			case 'l':
 				opts.is_last_track = true;
 				break;
-			case 's':
-				strncpy(buff,optarg,N-1);
-				buff[N-1]='\0';
-				opts.sample_start = parse_time(buff,N);
-				break;
-			case 'n':
-				strncpy(buff,optarg,N-1);
-				buff[N-1]='\0';
-				opts.sample_length = parse_time(buff,N);
-				break;
 		}
 	}
+	int args_left = argc - optind;
 
-	printf("Track type: %sfirst,%slast\n",opts.is_first_track?"":"not ",opts.is_last_track?"":"not ");
-	printf("start sample: '%li'\n",opts.sample_start);
-	printf("number of samples: '%li'\n",opts.sample_length);
+	if (args_left<1) help("Too few arguments");
+	if (args_left>3) help("Too many arguments");
 
-	if (argc<2) help("Too few arguments");
-	if (argc>4) help("Too many arguments");
+	opts.filename = argv[optind];
 
-	opts.filename = argv[1];
-
-	printf("input filename: '%s'\n",opts.filename);
-
-	if (argc>2)
+	if (args_left>=2)
 	{
 		char buff[N];
-		strncpy(buff,argv[2],N-1);
-		opts.sample_start = parse_time(buff,N);
-		printf("start sample: '%li'\n",opts.sample_start);
+		strncpy(buff, argv[optind+1], N);
+		opts.sample_start = parse_time(buff, N);
 	}
 
-	if (argc>3)
+	if (args_left>2)
 	{
 		char buff[N];
-		strncpy(buff,argv[2],N-1);
-		opts.sample_length = parse_time(argv[3],N);
-		printf("length sample: '%li'\n",opts.sample_length);
+		strncpy(buff, argv[optind+2], N);
+		opts.sample_length = parse_time(buff, N);
 	}
+
+	debug("input filename: '%s'\n",opts.filename);
+	debug("Track type: %sfirst,%slast\n",opts.is_first_track?"":"not ",opts.is_last_track?"":"not ");
+	debug("start sample: '%li'\n",opts.sample_start);
+	debug("number of samples: '%li'\n",opts.sample_length);
 
 	return opts;
 }
@@ -194,9 +202,9 @@ int main(const int argc, char **argv)
 {
 	opts_t options = parse_args(argc,argv);
 
-	printf("Source file: '%s'\n", options.filename);
-	printf("Start at sample #: %ld\n", options.sample_start);
-	printf("Read samples: %ld\n", options.sample_length);
+	debug("Source file: '%s'\n", options.filename);
+	debug("Start at sample #: %ld\n", options.sample_start);
+	debug("Read samples: %ld\n", options.sample_length);
 
 	SF_INFO info;
 	memset(&info,0,sizeof(info));
@@ -206,8 +214,8 @@ int main(const int argc, char **argv)
 		fprintf(stderr,"Can't open file '%s': %s\n",options.filename,strerror(errno));
 		exit(1);
 	}
-	printf("File opened succesfully.\n");
-	printf("rate: %i, chan: %i, format: 0x%06x, sect: %i, seek: %i, frames: %li\n",
+	debug("File opened succesfully.\n");
+	debug("rate: %i, chan: %i, format: 0x%06x, sect: %i, seek: %i, frames: %li\n",
 			info.samplerate, info.channels, info.format, info.sections, info.seekable, info.frames );
 
 	if ( !(info.format & SF_FORMAT_PCM_16) || !(info.channels==2) )
@@ -239,10 +247,10 @@ int main(const int argc, char **argv)
 	size_t buf_size = num_samples * info.channels * sizeof(int16_t);
 	int16_t * buf  = malloc(buf_size);
 	memset(buf,0xff,buf_size);
-	printf("buf size: %zu\n", buf_size);
+	debug("buf size: %zu\n", buf_size);
 
 	long num_read = sf_read_short(fd, buf, num_samples*info.channels);
-	fprintf(stdout, "read %li samples\n", num_read);
+	debug("read %li samples\n", num_read);
 
 	//for (uint8_t *p = (uint8_t*) buf; p<(uint8_t*)buf+buf_size; p++) printf("%s%02x",((void*)p-(void*)buf)%40==0?"\n":" ",*p);
 	//printf("\n");
@@ -255,34 +263,51 @@ int main(const int argc, char **argv)
 
 	sf_close(fd);
 
-	/* now calc checksums */
-	uint32_t crc_v1a = _accuraterip_checksum_v1(buf,buf_size,false,false);
-	uint32_t crc_v2a = _accuraterip_checksum_v2(buf,buf_size,false,false);
+	/* test mode calculates all different variations */
+	if (options.test) {
+		/* now calc checksums */
+		uint32_t crc_v1a = _accuraterip_checksum_v1(buf, buf_size, false, false);
+		uint32_t crc_v2a = _accuraterip_checksum_v2(buf, buf_size, false, false);
 
-	uint32_t crc_v1b = 0;
-	uint32_t crc_v2b = 0;
-	uint32_t crc_v1c = 0;
-	uint32_t crc_v2c = 0;
-	uint32_t crc_v1d = 0;
-	uint32_t crc_v2d = 0;
-	uint32_t crc_v1e = 0;
-	uint32_t crc_v2e = 0;
-	int result1 = accuraterip_checksum(&crc_v1b,&crc_v2b,buf,num_samples,info.channels,false,false);
-	int result2 = accuraterip_checksum(&crc_v1c,&crc_v2c,buf,num_samples,info.channels,true,false);
-	int result3 = accuraterip_checksum(&crc_v1d,&crc_v2d,buf,num_samples,info.channels,false,true);
-	int result4 = accuraterip_checksum(&crc_v1e,&crc_v2e,buf,num_samples,info.channels,true,true);
-	if (result1!=0||result2!=0||result3!=0||result4!=0)
-	{
-		fprintf(stderr,"Error while calculating checksum\n");
-		exit(-1);
+		uint32_t crc_v1b = 0;
+		uint32_t crc_v2b = 0;
+		uint32_t crc_v1c = 0;
+		uint32_t crc_v2c = 0;
+		uint32_t crc_v1d = 0;
+		uint32_t crc_v2d = 0;
+		uint32_t crc_v1e = 0;
+		uint32_t crc_v2e = 0;
+		int result1 = accuraterip_checksum(&crc_v1b, &crc_v2b, buf, num_samples, info.channels, false, false);
+		int result2 = accuraterip_checksum(&crc_v1c, &crc_v2c, buf, num_samples, info.channels, true,  false);
+		int result3 = accuraterip_checksum(&crc_v1d, &crc_v2d, buf, num_samples, info.channels, false, true);
+		int result4 = accuraterip_checksum(&crc_v1e, &crc_v2e, buf, num_samples, info.channels, true,  true);
+		if (result1!=0 || result2!=0 || result3!=0 || result4!=0)
+		{
+			fprintf(stderr,"Error while calculating checksum\n");
+			exit(-1);
+		}
+
+		printf("checksums:\n");
+		printf(" - v1a: %08x - v2a: %08x\n", crc_v1a, crc_v2a);
+		printf(" - v1b: %08x - v2b: %08x\n", crc_v1b, crc_v2b);
+		printf("\n");
+		printf("checksum v1: n: %08x, f: %08x, l: %08x, s: %08x\n", crc_v1b, crc_v1c, crc_v1d, crc_v1e);
+		printf("checksum v2: n: %08x, f: %08x, l: %08x, s: %08x\n", crc_v2b, crc_v2c, crc_v2d, crc_v2e);
 	}
-
-	printf("checksums:\n");
-	printf(" - v1a: %08x - v2a: %08x\n", crc_v1a, crc_v2a);
-	printf(" - v1b: %08x - v2b: %08x\n", crc_v1b, crc_v2b);
-	printf("\n");
-	printf("checksum v1: n: %08x, f: %08x, l: %08x, s: %08x\n", crc_v1b, crc_v1c, crc_v1d, crc_v1e);
-	printf("checksum v2: n: %08x, f: %08x, l: %08x, s: %08x\n", crc_v2b, crc_v2c, crc_v2d, crc_v2e);
+	/* normal mode only outputs version 1 and version 2 checksums */
+	else
+	{
+		uint32_t crc_v1 = 0;
+		uint32_t crc_v2 = 0;
+		int result = accuraterip_checksum(&crc_v1, &crc_v2, buf, num_samples, info.channels,
+		                                  options.is_first_track, options.is_last_track);
+		if (result!=0)
+		{
+			fprintf(stderr,"Error while calculating checksum\n");
+			exit(-1);
+		}
+		printf("%08x\n%08x\n", crc_v1, crc_v2);
+	}
 
 	free(buf);
 

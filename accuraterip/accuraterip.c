@@ -28,7 +28,7 @@ uint32_t _accuraterip_checksum_v1_u32(
 	/* skip first 5 frames in first track */
 	if (is_first_track)
 	{
-		p += 5*SAMPLES_PER_FRAME;
+		//p += 5*SAMPLES_PER_FRAME;
 		assert(0); /* not supported */
 	}
 	/* skip last 5 seconds in final track */
@@ -66,7 +66,7 @@ uint32_t _accuraterip_checksum_v2_u32(
 	/* skip first 5 seconds in first track */
 	if (is_first_track)
 	{
-		p += 5*SAMPLES_PER_FRAME;
+		// p += 5*SAMPLES_PER_FRAME;
 		assert(0); /* not supported */
 	}
 	/* skip last 5 seconds in final track */
@@ -112,12 +112,12 @@ int accuraterip_checksum(
 	uint32_t crc_pos = 1;
 	if (is_first_track)
 	{
-		/* not sure why one would want to skip 5 full sectors minus 1 sample.  Maybe an off-by-one in
+		/* not sure why you would want to skip 5 full sectors minus 1 sample.  Maybe an off-by-one in
 		 * the original implementation?
 		 */
 		audio_start += (5*SAMPLES_PER_FRAME-1)*num_channels;
 		crc_pos += 5*SAMPLES_PER_FRAME-1;
-		printf("starting at pos %td, crc_pos=%u\n", (void*)audio_start-(void*)audio_data, crc_pos);
+		//printf("starting at pos %td, crc_pos=%u\n", (void*)audio_start-(void*)audio_data, crc_pos);
 	}
 	if (is_last_track)
 	{
