@@ -29,6 +29,9 @@
 
 #define FRAME_PER_MINUTE   (60*FRAMES_PER_SECOND)
 
+
+
+#if 0
 /* deprecated functions (use accuraterip_checksum() instead)
  * for a little-endian system, each sample is:
  * struct {
@@ -72,6 +75,7 @@ uint32_t _accuraterip_checksum_v2(
 	const uint32_t * const audio_data_u32 = (const uint32_t * const) audio_data;
 	return _accuraterip_checksum_v2_u32(audio_data_u32, audio_num_bytes, is_first_track, is_last_track);
 }
+#endif
 
 /* calculate version 1 and version 2 checksum of PCM_s16le data */
 int accuraterip_checksum(

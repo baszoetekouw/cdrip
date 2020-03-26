@@ -38,7 +38,9 @@ int help(const char * const error)
 	printf("Available options:\n");
 	printf("  --first (-f)   : track is first on disc (first 5 frames are ignored)\n");
 	printf("  --last (-l)    : track is last on disc (final 5 frames are ignored)\n");
+#if OBSOLETE_IMPLEMENTATIONS
 	printf("  --test (-t)    : show lots of test output (different variations of checksums)\n");
+#endif
 	printf("  --verbose (-v) : show verbose output\n");
 	printf("\n");
 	printf("<start>  :  start time of track in file (default: start of file)\n");
@@ -132,8 +134,10 @@ opts_t parse_args(const int argc, char ** argv)
 	{
 		{"help",    no_argument, NULL, 'h'},
 		{"verbose", no_argument, NULL, 'v'},
+#if OBSOLETE_IMPLEMENTATIONS
 		{"test",    no_argument, NULL, 't'},
-		{"first",   no_argument, NULL, 'f'},
+#endif
+        {"first",   no_argument, NULL, 'f'},
 		{"last",    no_argument, NULL, 'l'},
 		{NULL,      0,           NULL, 0  },
 	};
@@ -160,9 +164,11 @@ opts_t parse_args(const int argc, char ** argv)
 			case 'v':
 				VERBOSE = true;
 				break;
+#if OBSOLETE_IMPLEMENTATIONS
 			case 't':
 				opts.test = true;
 				break;
+#endif
 			case 'f':
 				opts.is_first_track = true;
 				break;
@@ -301,6 +307,7 @@ int main(const int argc, char **argv)
 	}
 	/* normal mode only outputs version 1 and version 2 checksums */
 	else
+#endif
 	{
 		uint32_t crc_v1 = 0;
 		uint32_t crc_v2 = 0;

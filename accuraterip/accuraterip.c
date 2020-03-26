@@ -11,6 +11,7 @@
 /* keeping this for reference's sake.  Doesn't properly calculate checksums for first or last track.
  * Please use accuraterip_checkum() instead
  */
+# if OBSOLETE_IMPLEMENTATIONS
 uint32_t _accuraterip_checksum_v1_u32(
 	const uint32_t * const audio_data,
 	const size_t audio_num_bytes,
@@ -45,10 +46,12 @@ uint32_t _accuraterip_checksum_v1_u32(
 
 	return crc;
 }
+#endif
 
 /* keeping this for reference's sake.  Doesn't properly calculate checksums for first or last track.
  * Please use accuraterip_checkum() instead
  */
+#if OBSOLETE_IMPLEMENTATIONS
 uint32_t _accuraterip_checksum_v2_u32(
 	const uint32_t * const audio_data,
 	const size_t audio_num_bytes,
@@ -85,6 +88,7 @@ uint32_t _accuraterip_checksum_v2_u32(
 
 	return crc;
 }
+#endif
 
 int accuraterip_checksum(
 	uint32_t * const checksum_v1,
