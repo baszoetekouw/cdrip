@@ -3,6 +3,7 @@ CFLAGS+=--std=c99
 CFLAGS+=-O3
 CFLAGS+=-ggdb3
 CFLAGS+=-fstack-check
+CFLAGS+=-march=native
 
 
 OBJS=accuraterip.o cmdline.o
