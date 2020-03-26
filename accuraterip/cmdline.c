@@ -9,7 +9,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <sndfile.h>
 
 #include "accuraterip.h"

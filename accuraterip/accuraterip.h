@@ -4,12 +4,17 @@
 #define _ISOC99_SOURCE
 
 #include <stdint.h>
-#include <stdbool.h>
 #include <unistd.h>
 #include <assert.h>
 
 #ifndef ACCURATERIP_H
 #define ACCURATERIP_H
+
+#define bool    _Bool
+#define true    1
+#define false   0
+
+#define OBSOLETE_IMPLEMENTATIONS 0
 
 #define BYTES_PER_SAMPLE     (4)
 #define SAMPLES_PER_FRAME  (588)
