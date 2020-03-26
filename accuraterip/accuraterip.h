@@ -1,10 +1,11 @@
 /* for strtol */
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedMacroInspection"
 #define _ISOC99_SOURCE
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <endian.h>
 #include <assert.h>
 
 #ifndef ACCURATERIP_H
@@ -69,7 +70,7 @@ uint32_t _accuraterip_checksum_v2(
 
 /* calculate version 1 and version 2 checksum of PCM_s16le data */
 int accuraterip_checksum(
-	uint32_t * const checksum_v1,
+    uint32_t * const checksum_v1,
 	uint32_t * const checksum_v2,
 	const int16_t * const audio_data,
 	const size_t num_samples,
@@ -79,7 +80,7 @@ int accuraterip_checksum(
 
 /* calculate version 1 and version 2 checksum of a subrange in a larger set of PCM_s16le data */
 static inline
-int accuraterip_checksum_sub(
+int __unused accuraterip_checksum_sub(
 	uint32_t * const checksum_v1,
 	uint32_t * const checksum_v2,
 	const int16_t * const audio_data,
@@ -102,3 +103,4 @@ int accuraterip_checksum_sub(
 }
 
 #endif
+

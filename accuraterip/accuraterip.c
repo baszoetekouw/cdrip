@@ -1,13 +1,12 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <unistd.h>
 #include <assert.h>
 
 #include <stdio.h>
 
 #include "accuraterip.h"
 
-#define HI_U64(x) ((uint32_t)((x)>>32))
+#define HI_U64(x) ((uint32_t)((x)>>32U))
 #define LO_U64(x) ((uint32_t)((x)&(uint64_t)0xffffffff))
 
 /* keeping this for reference's sake.  Doesn't properly calculate checksums for first or last track.
@@ -131,7 +130,7 @@ int accuraterip_checksum(
 	{
 		const uint32_t left  = (uint16_t) *p;      /* left channel  */
 		const uint32_t right = (uint16_t) *(p+1);  /* right channel */
-		const uint32_t val   = (right<<16) | left; /* combined left/right in a single sample */
+		const uint32_t val   = (right<<16U) | left; /* combined left/right in a single sample */
 
 		/* checksums are calculated by adding all sample values together, with a multiplication
 		 * factor, and letting it overflow happily */
@@ -140,7 +139,7 @@ int accuraterip_checksum(
 		/* this will creepily overflow, but that's how it supposed to be, I guess */
 		crc1 += tmp;
 
-		/* version 2 handles the overflow a little bit more explicit.  Not sure if it's actually better... */
+		/* version 2 handles the overflow a little bit more explicitly.  Not sure if it's actually better... */
 		crc2 += HI_U64(tmp) + LO_U64(tmp);
 	}
 

@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedMacroInspection"
 /* for strtol */
 #define _ISOC99_SOURCE
 
@@ -5,6 +7,7 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
+#include <inttypes.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <sndfile.h>
@@ -23,7 +26,7 @@ typedef struct {
 #define N 255
 
 static bool VERBOSE = false;
-#define debug(a...) { if (VERBOSE) printf(a); }
+#define debug(a...) ({ if (VERBOSE) printf(a); })
 
 int help(const char * const error)
 {
@@ -140,7 +143,7 @@ opts_t parse_args(const int argc, char ** argv)
 	{
 		int opt_idx;
 		char buff[N];
-		char c = getopt_long(argc, argv, short_options, long_options, &opt_idx);
+		int c = getopt_long(argc, argv, short_options, long_options, &opt_idx);
 		opterr = 0; /* don't print error messages */
 
 		if (c==-1)
@@ -167,6 +170,8 @@ opts_t parse_args(const int argc, char ** argv)
 			case 'l':
 				opts.is_last_track = true;
 				break;
+		    default:
+		        help("Unknown option specified");
 		}
 	}
 	int args_left = argc - optind;
@@ -190,10 +195,10 @@ opts_t parse_args(const int argc, char ** argv)
 		opts.sample_length = parse_time(buff, N);
 	}
 
-	debug("input filename: '%s'\n",opts.filename);
-	debug("Track type: %sfirst,%slast\n",opts.is_first_track?"":"not ",opts.is_last_track?"":"not ");
-	debug("start sample: '%li'\n",opts.sample_start);
-	debug("number of samples: '%li'\n",opts.sample_length);
+	debug("input filename: '%s'\n", opts.filename);
+	debug("Track type: %sfirst,%slast\n", opts.is_first_track ? "" : "not ", opts.is_last_track ? "" : "not ");
+	debug("start sample: '%"PRId64"'\n", opts.sample_start);
+	debug("number of samples: '%"PRId64"'\n", opts.sample_length);
 
 	return opts;
 }
@@ -203,8 +208,8 @@ int main(const int argc, char **argv)
 	opts_t options = parse_args(argc,argv);
 
 	debug("Source file: '%s'\n", options.filename);
-	debug("Start at sample #: %ld\n", options.sample_start);
-	debug("Read samples: %ld\n", options.sample_length);
+	debug("Start at sample #: %"PRId64"\n", options.sample_start);
+	debug("Read samples: %"PRId64"\n", options.sample_length);
 
 	SF_INFO info;
 	memset(&info,0,sizeof(info));
@@ -215,10 +220,10 @@ int main(const int argc, char **argv)
 		exit(1);
 	}
 	debug("File opened succesfully.\n");
-	debug("rate: %i, chan: %i, format: 0x%06x, sect: %i, seek: %i, frames: %li\n",
+	debug("rate: %i, chan: %i, format: 0x%06x, sect: %i, seek: %i, frames: %"PRId64"\n",
 			info.samplerate, info.channels, info.format, info.sections, info.seekable, info.frames );
 
-	if ( !(info.format & SF_FORMAT_PCM_16) || !(info.channels==2) )
+	if ( !(info.format & SF_FORMAT_PCM_16) || info.channels!=2 ) // NOLINT(hicpp-signed-bitwise)
 	{
 		fprintf(stderr, "This is not a stereo PCM16 file\n");
 		exit(1);
@@ -233,7 +238,7 @@ int main(const int argc, char **argv)
 	/* Note: seek uses 2-channel samples, so seek of 1 means skip 32 bits */
 	if (sf_seek(fd,options.sample_start,SEEK_SET)<0)
 	{
-		fprintf(stderr, "Error while seeking to sample %ld\n", options.sample_start);
+		fprintf(stderr, "Error while seeking to sample %"PRId64"\n", options.sample_start);
 		exit(1);
 	}
 
@@ -257,12 +262,13 @@ int main(const int argc, char **argv)
 
 	if (num_read!=num_samples*info.channels)
 	{
-		fprintf(stderr, "Could read only %li of %li frames\n", num_read, info.frames);
+		fprintf(stderr, "Could read only %li of %"PRId64" frames\n", num_read, info.frames);
 		exit(1);
 	}
 
 	sf_close(fd);
 
+#if OBSOLETE_IMPLEMENTATIONS
 	/* test mode calculates all different variations */
 	if (options.test) {
 		/* now calc checksums */
@@ -313,3 +319,4 @@ int main(const int argc, char **argv)
 
 	return 0;
 }
+
