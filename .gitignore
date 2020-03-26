@@ -3,7 +3,5 @@ env
 venv
 *.o
 accuraterip/accuraterip
-accuraterip/test/test.*
-accuraterip/test/test_*.wav
 .mypy_cache
 __pycache__
