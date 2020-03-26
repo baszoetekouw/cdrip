@@ -3,5 +3,9 @@ env
 venv
 *.o
 accuraterip/accuraterip
-accuraterip/test.*
-accuraterip/test_*
+accuraterip/test/test.*
+accuraterip/test/test_*.wav
+.mypy_cache
+__pycache__
+CMakeCache.txt
+*.cmake
