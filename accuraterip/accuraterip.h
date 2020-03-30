@@ -1,12 +1,3 @@
-/* for strtol */
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "OCUnusedMacroInspection"
-#define _ISOC99_SOURCE
-
-#include <stdint.h>
-#include <unistd.h>
-#include <assert.h>
-
 #ifndef ACCURATERIP_H
 #define ACCURATERIP_H
 
@@ -29,9 +20,30 @@
 
 #define FRAME_PER_MINUTE   (60*FRAMES_PER_SECOND)
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <assert.h>
+
+extern bool VERBOSE;
+#define debug(a...) ({ if (VERBOSE) printf(a); })
+
+typedef struct {
+    const char * filename;
+    int64_t sample_start;
+    int64_t sample_length;
+    bool is_first_track;
+    bool is_last_track;
+    bool test;
+} opts_t;
+
+/* util.c */
+size_t parse_time(const char * const time_str, const size_t buff_size);
+/* cmdline.c */
+int help(const char * const error);
+opts_t parse_args(const int argc, char ** argv);
 
 
-#if 0
+#if OBSOLETE_IMPLEMENTATIONS
 /* deprecated functions (use accuraterip_checksum() instead)
  * for a little-endian system, each sample is:
  * struct {

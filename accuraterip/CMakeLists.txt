@@ -8,5 +8,5 @@ link_directories(/opt/brew/lib)
 add_executable(accuraterip
         accuraterip.c
         accuraterip.h
-        cmdline.c)
+        cmdline.c main.c util.c)
 target_link_libraries(accuraterip sndfile)
