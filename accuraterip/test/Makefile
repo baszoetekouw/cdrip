@@ -26,4 +26,4 @@ full.wav: full.flac
 	flac -d -f  -o $@ $<
 
 short.wav: full.wav
-	sox $< $@ trim 30 10
+	sox $< $@ trim 30 20
