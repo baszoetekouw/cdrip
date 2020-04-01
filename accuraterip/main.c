@@ -12,10 +12,6 @@ int main(const int argc, char **argv)
 {
     opts_t options = parse_args(argc,argv);
 
-    debug("Source file: '%s'\n", options.filename);
-    debug("Start at sample #: %"PRId64"\n", options.sample_start);
-    debug("Read samples: %"PRId64"\n", options.sample_length);
-
     SF_INFO info;
     memset(&info,0,sizeof(info));
     SNDFILE *fd = sf_open(options.filename, SFM_READ, &info);
@@ -41,18 +37,18 @@ int main(const int argc, char **argv)
 
     /* seek to the starting position */
     /* Note: seek uses 2-channel samples, so seek of 1 means skip 32 bits */
-    if (sf_seek(fd,options.sample_start,SEEK_SET)<0)
+    if (sf_seek(fd,options.tracks[0].sample_start,SEEK_SET)<0)
     {
-        fprintf(stderr, "Error while seeking to sample %"PRId64"\n", options.sample_start);
+        fprintf(stderr, "Error while seeking to sample %"PRId64"\n", options.tracks[0].sample_start);
         exit(1);
     }
 
     /* Note: 1 sample consists of 2 16-bit values (left and right channel) */
-    int64_t num_samples;
-    if (options.sample_length>0)
-        num_samples = options.sample_length;
+    sample_t num_samples;
+    if (options.tracks[0].sample_length>0)
+        num_samples = options.tracks[0].sample_length;
     else
-        num_samples = info.frames-options.sample_start;
+        num_samples = info.frames-options.tracks[0].sample_start;
 
     size_t buf_size = num_samples * info.channels * sizeof(int16_t);
     int16_t * buf  = malloc(buf_size);
@@ -112,7 +108,7 @@ int main(const int argc, char **argv)
         uint32_t crc_v1 = 0;
         uint32_t crc_v2 = 0;
         int result = accuraterip_checksum(&crc_v1, &crc_v2, buf, num_samples, info.channels,
-                                          options.is_first_track, options.is_last_track);
+                                          options.tracks[0].is_first_track, options.tracks[0].is_last_track);
         if (result!=0)
         {
             fprintf(stderr,"Error while calculating checksum\n");

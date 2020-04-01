@@ -1,12 +1,10 @@
 #include "accuraterip.h"
 
-/* for strtol */
-#define _ISOC99_SOURCE
-
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
-size_t parse_time(const char * const time_str, const size_t buff_size)
+sample_t parse_time(const char * const time_str, const size_t buff_size)
 {
     /* We're going to parse a time input string
      * These strings can be either in the form "<samples>s" to specifiy a fixed number of samples
@@ -16,7 +14,8 @@ size_t parse_time(const char * const time_str, const size_t buff_size)
 
     /* copy the string to a local buffer, to make sure it's NULL-terminated */
     char buff[buff_size+1];
-    memcpy(buff,time_str,buff_size);
+    memset(buff, 0, sizeof(buff));
+    strncpy(buff, time_str, buff_size);
     buff[buff_size] = '\0';
 
     /* pointer to current position in buffer */
@@ -51,8 +50,8 @@ size_t parse_time(const char * const time_str, const size_t buff_size)
     if (p2==p1)
     {
         /* pointer hasn't moved, so there was no number to decode,
-         * which means num1 is the final answer, and should be interpretated as a number of frames */
-        return num1*SAMPLES_PER_FRAME;
+         * which means num1 is the final answer, and should be interpreted as a number of SECONDS */
+        return num1*SAMPLES_PER_SECOND;
     }
 
     /* fetch third number in the string */
@@ -71,5 +70,25 @@ size_t parse_time(const char * const time_str, const size_t buff_size)
 
     /* otherwise, we got minutes:seconds:frames */
     return num1*SAMPLES_PER_MINUTE + num2*SAMPLES_PER_SECOND + num3*SAMPLES_PER_FRAME;
+}
+
+
+const char * samplestostr(char * const buff, const size_t len, const sample_t samples)
+{
+    if (samples>MAX_SAMPLES)
+    {
+        return "overflow";
+    }
+    if (samples<0)
+    {
+        return "inf";
+    }
+    const unsigned min = samples / SAMPLES_PER_MINUTE;
+    const unsigned sec = ( samples / SAMPLES_PER_SECOND ) % 60;
+    const unsigned frm = ( samples / SAMPLES_PER_FRAME  ) % FRAMES_PER_SECOND;
+    const unsigned smp = samples % SAMPLES_PER_FRAME;
+
+    snprintf(buff, len, "%02u:%02u:%02u.%03u", min, sec, frm, smp);
+    return buff;
 }
 

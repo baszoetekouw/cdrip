@@ -11,14 +11,22 @@
 #define SAMPLES_PER_FRAME  (588)
 #define FRAMES_PER_SECOND   (75)
 
-#define BYTES_PER_FRAME    (BYTES_PER_SAMPLE*SAMPLES_PER_FRAME)
-#define BYTES_PER_SECOND   (BYTES_PER_FRAME*FRAMES_PER_SECOND)
-#define BYTES_PER_MINUTE   (60*BYTES_PER_SECOND)
+//#define BYTES_PER_FRAME    (BYTES_PER_SAMPLE*SAMPLES_PER_FRAME)
+//#define BYTES_PER_SECOND   (BYTES_PER_FRAME*FRAMES_PER_SECOND)
+//#define BYTES_PER_MINUTE   (60*BYTES_PER_SECOND)
 
 #define SAMPLES_PER_SECOND (SAMPLES_PER_FRAME*FRAMES_PER_SECOND)
 #define SAMPLES_PER_MINUTE (60*SAMPLES_PER_SECOND)
 
-#define FRAME_PER_MINUTE   (60*FRAMES_PER_SECOND)
+//#define FRAMES_PER_MINUTE  (60*FRAMES_PER_SECOND)
+
+/* track limit is hard is the spec, but actual CD size/length is implementation/fab dependent,
+ * so 99 is a real upper limit, but 85 minutes i simply a practical upper limit */
+#define MAX_TRACKS 99
+#define MAX_SECONDS (85*60)
+#define MAX_SAMPLES (MAX_SECONDS*SAMPLES_PER_SECOND)
+
+
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -27,17 +35,25 @@
 extern bool VERBOSE;
 #define debug(a...) ({ if (VERBOSE) printf(a); })
 
+typedef int64_t sample_t;
+
 typedef struct {
-    const char * filename;
-    int64_t sample_start;
-    int64_t sample_length;
+    sample_t sample_start;
+    sample_t sample_length;
     bool is_first_track;
     bool is_last_track;
+} track_t;
+
+typedef struct {
+    const char *filename;
     bool test;
+    unsigned int num_tracks;
+    track_t tracks[MAX_TRACKS];
 } opts_t;
 
 /* util.c */
 size_t parse_time(const char * const time_str, const size_t buff_size);
+const char * samplestostr(char * const buff, const size_t len, const sample_t samples);
 /* cmdline.c */
 int help(const char * const error);
 opts_t parse_args(const int argc, char ** argv);
