@@ -2,5 +2,6 @@ test/full.wav
 test/short.wav
 CMakeFiles/
 CMakeCache.txt
+Makefile
 *.cmake
 *.cbp
