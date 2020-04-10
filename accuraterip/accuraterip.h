@@ -87,7 +87,7 @@ uint32_t _accuraterip_checksum_v1(
 	const bool is_first_track,
 	const bool is_last_track)
 {
-	assert(__BYTE_ORDER == __LITTLE_ENDIAN);
+	static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "Only little-endian systems are supported");
 	const uint32_t * const audio_data_u32 = (const uint32_t * const) audio_data;
 	return _accuraterip_checksum_v1_u32(audio_data_u32, audio_num_bytes, is_first_track, is_last_track);
 }
@@ -99,7 +99,7 @@ uint32_t _accuraterip_checksum_v2(
 	const bool is_first_track,
 	const bool is_last_track)
 {
-	assert(__BYTE_ORDER == __LITTLE_ENDIAN);
+    static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "Only little-endian systems are supported");
 	const uint32_t * const audio_data_u32 = (const uint32_t * const) audio_data;
 	return _accuraterip_checksum_v2_u32(audio_data_u32, audio_num_bytes, is_first_track, is_last_track);
 }

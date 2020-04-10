@@ -81,7 +81,7 @@ uint32_t _accuraterip_checksum_v2_u32(
 	for (; p < audio_data+audio_num_samples; p++)
 	{
 		const uint64_t crc_tmp = crc_pos++ * (*p);
-		const uint32_t crc_tmp_hi = (uint32_t)( crc_tmp >> 32 );
+		const uint32_t crc_tmp_hi = (uint32_t)( crc_tmp >> 32U );
 		const uint32_t crc_tmp_lo = (uint32_t)( crc_tmp & (uint64_t)0xffffffff );
 		crc += crc_tmp_hi + crc_tmp_lo;
 	}
@@ -114,7 +114,7 @@ int accuraterip_checksum(
 	uint32_t crc_pos = 1;
 	if (is_first_track)
 	{
-		/* not sure why you would want to skip 5 full sectors minus 1 sample.  Maybe an off-by-one in
+		/* not sure why you would want to skip 5 full frames minus 1 sample.  Maybe an off-by-one in
 		 * the original implementation?
 		 */
 		audio_start += (5*SAMPLES_PER_FRAME-1)*num_channels;
