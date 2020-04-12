@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-sample_t parse_time(const char * const time_str, const size_t buff_size)
+samplenum_t parse_time(const char * const time_str, const size_t buff_size)
 {
     /* We're going to parse a time input string
      * These strings can be either in the form "<samples>s" to specifiy a fixed number of samples
@@ -73,7 +73,7 @@ sample_t parse_time(const char * const time_str, const size_t buff_size)
 }
 
 
-const char * samplestostr(char * const buff, const size_t len, const sample_t samples)
+const char * samplestostr(char * const buff, const size_t len, const samplenum_t samples)
 {
     if (samples>MAX_SAMPLES)
     {

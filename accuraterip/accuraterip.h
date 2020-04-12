@@ -31,15 +31,27 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <sndfile.h>
 
 extern bool VERBOSE;
 #define debug(a...) ({ if (VERBOSE) printf(a); })
 
-typedef int64_t sample_t;
+typedef struct {
+    SNDFILE *fd;
+    SF_INFO info;
+} soundfile_t;
+
+typedef int16_t sample_t;
+typedef int64_t samplenum_t;
 
 typedef struct {
-    sample_t sample_start;
-    sample_t sample_length;
+    samplenum_t num_samples;
+    sample_t *samples;
+} sndbuff_t;
+
+typedef struct {
+    samplenum_t sample_start;
+    samplenum_t sample_length;
     bool is_first_track;
     bool is_last_track;
 } track_t;
@@ -52,8 +64,8 @@ typedef struct {
 } opts_t;
 
 /* util.c */
-size_t parse_time(const char * const time_str, const size_t buff_size);
-const char * samplestostr(char * const buff, const size_t len, const sample_t samples);
+samplenum_t parse_time(const char * const time_str, const size_t buff_size);
+const char * samplestostr(char * const buff, const size_t len, const samplenum_t samples);
 /* cmdline.c */
 int help(const char * const error);
 opts_t parse_args(const int argc, char ** argv);
