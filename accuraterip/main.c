@@ -103,53 +103,16 @@ int main(const int argc, char **argv)
 
     close_sndfile(&soundfile);
 
-#if OBSOLETE_IMPLEMENTATIONS
-    /* test mode calculates all different variations */
-	if (options.test) {
-		/* now calc checksums */
-		uint32_t crc_v1a = _accuraterip_checksum_v1(buf, buf_size, false, false);
-		uint32_t crc_v2a = _accuraterip_checksum_v2(buf, buf_size, false, false);
-
-		uint32_t crc_v1b = 0;
-		uint32_t crc_v2b = 0;
-		uint32_t crc_v1c = 0;
-		uint32_t crc_v2c = 0;
-		uint32_t crc_v1d = 0;
-		uint32_t crc_v2d = 0;
-		uint32_t crc_v1e = 0;
-		uint32_t crc_v2e = 0;
-		int result1 = accuraterip_checksum(&crc_v1b, &crc_v2b, buf, num_samples, sf_info.channels, false, false);
-		int result2 = accuraterip_checksum(&crc_v1c, &crc_v2c, buf, num_samples, sf_info.channels, true,  false);
-		int result3 = accuraterip_checksum(&crc_v1d, &crc_v2d, buf, num_samples, sf_info.channels, false, true);
-		int result4 = accuraterip_checksum(&crc_v1e, &crc_v2e, buf, num_samples, sf_info.channels, true,  true);
-		if (result1!=0 || result2!=0 || result3!=0 || result4!=0)
-		{
-			fprintf(stderr,"Error while calculating checksum\n");
-			exit(-1);
-		}
-
-		printf("checksums:\n");
-		printf(" - v1a: %08x - v2a: %08x\n", crc_v1a, crc_v2a);
-		printf(" - v1b: %08x - v2b: %08x\n", crc_v1b, crc_v2b);
-		printf("\n");
-		printf("checksum v1: n: %08x, f: %08x, l: %08x, s: %08x\n", crc_v1b, crc_v1c, crc_v1d, crc_v1e);
-		printf("checksum v2: n: %08x, f: %08x, l: %08x, s: %08x\n", crc_v2b, crc_v2c, crc_v2d, crc_v2e);
-	}
-	/* normal mode only outputs version 1 and version 2 checksums */
-	else
-#endif
+    uint32_t crc_v1 = 0;
+    uint32_t crc_v2 = 0;
+    int result = accuraterip_checksum(&crc_v1, &crc_v2, sndbuf.samples, sndbuf.num_samples,
+            soundfile.info.channels, options.tracks[0].is_first_track, options.tracks[0].is_last_track);
+    if (result!=0)
     {
-        uint32_t crc_v1 = 0;
-        uint32_t crc_v2 = 0;
-        int result = accuraterip_checksum(&crc_v1, &crc_v2, sndbuf.samples, sndbuf.num_samples,
-                soundfile.info.channels, options.tracks[0].is_first_track, options.tracks[0].is_last_track);
-        if (result!=0)
-        {
-            fprintf(stderr,"Error while calculating checksum\n");
-            exit(-1);
-        }
-        printf("%08x\n%08x\n", crc_v1, crc_v2);
+        fprintf(stderr,"Error while calculating checksum\n");
+        exit(-1);
     }
+    printf("%08x\n%08x\n", crc_v1, crc_v2);
 
     free(sndbuf.samples);
 

@@ -71,52 +71,6 @@ int help(const char * const error);
 opts_t parse_args(const int argc, char ** argv);
 
 
-#if OBSOLETE_IMPLEMENTATIONS
-/* deprecated functions (use accuraterip_checksum() instead)
- * for a little-endian system, each sample is:
- * struct {
- *   int16_t sample_left;  // little-endian
- *   int16_t sample_right; // little-endian
- * }
- */
-uint32_t _accuraterip_checksum_v1_u32(
-	const uint32_t * const audio_data,
-	const size_t audio_num_bytes,
-	const bool is_first_track,
-	const bool is_last_track);
-
-uint32_t _accuraterip_checksum_v2_u32(
-	const uint32_t * const audio_data,
-	const size_t audio_num_bytes,
-	const bool is_first_track,
-	const bool is_last_track);
-
-/* same as above, but accept an array of individual 16-bit samples (channels should be interleaved) */
-static inline
-uint32_t _accuraterip_checksum_v1(
-	const int16_t * const audio_data,
-	const size_t audio_num_bytes,
-	const bool is_first_track,
-	const bool is_last_track)
-{
-	static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "Only little-endian systems are supported");
-	const uint32_t * const audio_data_u32 = (const uint32_t * const) audio_data;
-	return _accuraterip_checksum_v1_u32(audio_data_u32, audio_num_bytes, is_first_track, is_last_track);
-}
-
-static inline
-uint32_t _accuraterip_checksum_v2(
-	const int16_t * const audio_data,
-	const size_t audio_num_bytes,
-	const bool is_first_track,
-	const bool is_last_track)
-{
-    static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "Only little-endian systems are supported");
-	const uint32_t * const audio_data_u32 = (const uint32_t * const) audio_data;
-	return _accuraterip_checksum_v2_u32(audio_data_u32, audio_num_bytes, is_first_track, is_last_track);
-}
-#endif
-
 /* calculate version 1 and version 2 checksum of PCM_s16le data */
 int accuraterip_checksum(
     uint32_t * const checksum_v1,
