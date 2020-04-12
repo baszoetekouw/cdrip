@@ -1,11 +1,7 @@
 #include "accuraterip.h"
 
-#include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
-#include <string.h>
-#include <inttypes.h>
-#include <assert.h>
 
 #define N 255
 

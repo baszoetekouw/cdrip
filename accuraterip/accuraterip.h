@@ -27,9 +27,10 @@
 #define MAX_SAMPLES (MAX_SECONDS*SAMPLES_PER_SECOND)
 
 
-
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <sndfile.h>
 
@@ -69,6 +70,11 @@ const char * samplestostr(char * const buff, const size_t len, const samplenum_t
 /* cmdline.c */
 int help(const char * const error);
 opts_t parse_args(const int argc, char ** argv);
+/* file.c */
+soundfile_t open_sndfile(const char * const filename);
+int close_sndfile(soundfile_t * const soundfile);
+sndbuff_t fill_sndbuf(const soundfile_t soundfile,
+                      const samplenum_t start, const samplenum_t len);
 
 
 /* calculate version 1 and version 2 checksum of PCM_s16le data */

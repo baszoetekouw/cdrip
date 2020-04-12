@@ -1,9 +1,6 @@
-#include <stdint.h>
-#include <assert.h>
+#include "accuraterip.h"
 
 #include <stdio.h>
-
-#include "accuraterip.h"
 
 #define HI_U64(x) ((uint32_t)((x)>>32U))
 #define LO_U64(x) ((uint32_t)((x)&(uint64_t)0xffffffff))
