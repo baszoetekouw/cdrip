@@ -1,5 +1,7 @@
 test/full.wav
 test/short.wav
+test/short2.wav
+test/short3.wav
 CMakeFiles/
 CMakeCache.txt
 Makefile

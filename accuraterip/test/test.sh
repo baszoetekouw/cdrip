@@ -24,6 +24,12 @@ SHORT_V1_FIRST=c4093dce
 SHORT_V1_LAST=3feb027c
 SHORT_V1_SINGLE=0f98efe6
 
+SHORT2_V2_NORMAL=32399085
+SHORT2_V1_NORMAL=96dbf310
+
+SHORT3_V2_LAST=38c4e03c
+SHORT3_V1_LAST=ab7b4804
+
 function comp() {
 	MSG=$1
 	OK1=$2
@@ -44,44 +50,51 @@ function comp() {
 
 
 # check full file
-chksums=($(../accuraterip full.wav))
+chksums=($(../accuraterip full.wav | cut '-d ' -f 4-5))
 comp "full.wav (middle track)... " $FULL_V1_NORMAL $FULL_V2_NORMAL ${chksums[@]}
 
-chksums=($(../accuraterip -f full.wav))
+chksums=($(../accuraterip -f full.wav | cut '-d ' -f 4-5))
 comp "full.wav (first track)... " $FULL_V1_FIRST $FULL_V2_FIRST ${chksums[@]}
 
-chksums=($(../accuraterip -l full.wav))
+chksums=($(../accuraterip -l full.wav | cut '-d ' -f 4-5))
 comp "full.wav (last track)... " $FULL_V1_LAST $FULL_V2_LAST ${chksums[@]}
 
-chksums=($(../accuraterip -f -l full.wav))
+chksums=($(../accuraterip -f -l full.wav | cut '-d ' -f 4-5))
 comp "full.wav (single track)... " $FULL_V1_SINGLE $FULL_V2_SINGLE ${chksums[@]}
 
 
 # check short file
-chksums=($(../accuraterip short.wav))
+chksums=($(../accuraterip short.wav | cut '-d ' -f 4-5))
 comp "short.wav (middle track)... " $SHORT_V1_NORMAL $SHORT_V2_NORMAL ${chksums[@]}
 
-chksums=($(../accuraterip -f short.wav))
+chksums=($(../accuraterip -f short.wav | cut '-d ' -f 4-5))
 comp "short.wav (first track)... " $SHORT_V1_FIRST $SHORT_V2_FIRST ${chksums[@]}
 
-chksums=($(../accuraterip -l short.wav))
+chksums=($(../accuraterip -l short.wav | cut '-d ' -f 4-5))
 comp "short.wav (last track)... " $SHORT_V1_LAST $SHORT_V2_LAST ${chksums[@]}
 
-chksums=($(../accuraterip -f -l short.wav))
+chksums=($(../accuraterip -f -l short.wav | cut '-d ' -f 4-5))
 comp "short.wav (single track)... " $SHORT_V1_SINGLE $SHORT_V2_SINGLE ${chksums[@]}
 
 
 # check long file subset
-chksums=($(../accuraterip full.wav 30,20 ))
+chksums=($(../accuraterip full.wav 30,20 | cut '-d ' -f 4-5))
 comp "subset of full.wav (middle track)... " $SHORT_V1_NORMAL $SHORT_V2_NORMAL ${chksums[@]}
 
-chksums=($(../accuraterip -f full.wav 30,20))
+chksums=($(../accuraterip -f full.wav 30,20 | cut '-d ' -f 4-5))
 comp "subset of full.wav (first track)... " $SHORT_V1_FIRST $SHORT_V2_FIRST ${chksums[@]}
 
-chksums=($(../accuraterip -l full.wav 30,20))
+chksums=($(../accuraterip -l full.wav 30,20 | cut '-d ' -f 4-5))
 comp "subset of full.wav (last track)... " $SHORT_V1_LAST $SHORT_V2_LAST ${chksums[@]}
 
-chksums=($(../accuraterip -f -l full.wav 30,20))
+chksums=($(../accuraterip -f -l full.wav 30,20 | cut '-d ' -f 4-5))
 comp "subset of full.wav (single track)... " $SHORT_V1_SINGLE $SHORT_V2_SINGLE ${chksums[@]}
+
+# check long file multiple tracks
+chksums=($(../accuraterip full.wav 30,20 50,25 75,30 | cut '-d ' -f 4-5))
+comp "subset of full.wav (track 1)... " $SHORT_V1_FIRST   $SHORT_V2_FIRST   ${chksums[@]:0:2}
+comp "subset of full.wav (track 2)... " $SHORT2_V1_NORMAL $SHORT2_V2_NORMAL ${chksums[@]:2:2}
+comp "subset of full.wav (track 3)... " $SHORT3_V1_LAST   $SHORT3_V2_LAST   ${chksums[@]:4:2}
+
 
 echo "Finished"

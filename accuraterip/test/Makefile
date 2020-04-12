@@ -10,14 +10,14 @@ OBJS=accuraterip.o cmdline.o
 LIBS+=-lsndfile
 
 .PHONY: all
-all: short.wav
+all: short.wav short2.wav short3.wav
 
 .PHONY: test
 test: short.wav
 
 .PHONY: clean
 clean:
-	-rm -f short.wav full.wav
+	-rm -f short.wav short2.wav short3.wav full.wav
 
 full.flac: JOHN_MICHEL_CELLO-J_S_BACH_CELLO_SUITE_1_in_G_Minuets.ogg
 	flac -9 $< $@
@@ -27,3 +27,9 @@ full.wav: full.flac
 
 short.wav: full.wav
 	sox $< $@ trim 30 20
+
+short2.wav: full.wav
+	sox $< $@ trim 50 25
+
+short3.wav: full.wav
+	sox $< $@ trim 75 30

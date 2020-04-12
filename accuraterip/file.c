@@ -38,7 +38,8 @@ soundfile_t open_sndfile(const char * const filename)
 int close_sndfile(soundfile_t * const soundfile)
 {
     int ret = sf_close(soundfile->fd);
-    soundfile->fd = NULL;
+    if (ret==0)
+        memset(soundfile, 0, sizeof(*soundfile));
     return ret;
 }
 
