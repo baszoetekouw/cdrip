@@ -11,8 +11,7 @@ int accuraterip_checksum(
 	const int16_t * const audio_data,
 	const size_t num_samples,
 	const unsigned short num_channels,
-	const bool is_first_track,
-	const bool is_last_track)
+	const unsigned track_type)
 {
 	assert( num_samples > 0 );
 	assert( audio_data );
@@ -27,7 +26,7 @@ int accuraterip_checksum(
 	const uint16_t *audio_start = (const uint16_t *) audio_data;
 	const uint16_t *audio_end   = audio_start + num_samples*num_channels;
 	uint32_t crc_pos = 1;
-	if (is_first_track)
+	if (is_first_track(track_type))
 	{
 		/* not sure why you would want to skip 5 full frames minus 1 sample.  Maybe an off-by-one in
 		 * the original implementation?
@@ -36,7 +35,7 @@ int accuraterip_checksum(
 		crc_pos += 5*SAMPLES_PER_FRAME-1;
 		//printf("starting at pos %td, crc_pos=%u\n", (void*)audio_start-(void*)audio_data, crc_pos);
 	}
-	if (is_last_track)
+	if (is_last_track(track_type))
 	{
 		/* a the the end, we do skip exactly 5 full sectors */
 		audio_end -= 5*SAMPLES_PER_FRAME*num_channels;

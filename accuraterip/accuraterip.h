@@ -5,7 +5,7 @@
 #define true    1
 #define false   0
 
-#define OBSOLETE_IMPLEMENTATIONS 0
+//#define DEBUG
 
 #define BYTES_PER_SAMPLE     (4)
 #define SAMPLES_PER_FRAME  (588)
@@ -26,6 +26,7 @@
 #define MAX_SECONDS (85*60)
 #define MAX_SAMPLES (MAX_SECONDS*SAMPLES_PER_SECOND)
 
+#define MAX_OFFSET (5*SAMPLES_PER_SECOND-1)
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -33,6 +34,8 @@
 #include <string.h>
 #include <assert.h>
 #include <sndfile.h>
+
+
 
 extern bool VERBOSE;
 #define debug(a...) ({ if (VERBOSE) printf(a); })
@@ -50,25 +53,33 @@ typedef struct {
     sample_t *samples;
 } sndbuff_t;
 
+#define NORMAL_TRACK 0U
+#define FIRST_TRACK  1U
+#define LAST_TRACK   2U
+#define SINGLE_TRACK 3U
+
+#define is_normal_track(track_type) ((track_type)==NORMAL_TRACK)
+#define is_first_track(track_type) ((track_type)&FIRST_TRACK)
+#define is_last_track(track_type)  ((track_type)&LAST_TRACK)
+#define is_single_track(track_type)  ((track_type)==SINGLE_TRACK)
+
 typedef struct {
     samplenum_t sample_start;
     samplenum_t sample_length;
-    bool is_first_track;
-    bool is_last_track;
+    unsigned track_type;
 } track_t;
 
 typedef struct {
     const char *filename;
-    bool test;
     unsigned int num_tracks;
     track_t tracks[MAX_TRACKS];
 } opts_t;
 
 /* util.c */
-samplenum_t parse_time(const char * const time_str, const size_t buff_size);
+samplenum_t parse_time(const char * const time_str, const size_t buf_size);
 const char * samplestostr(char * const buff, const size_t len, const samplenum_t samples);
 /* cmdline.c */
-int help(const char * const error);
+int help(const char * const error, ...);
 opts_t parse_args(const int argc, char ** argv);
 /* file.c */
 soundfile_t open_sndfile(const char * const filename);
@@ -84,8 +95,7 @@ int accuraterip_checksum(
 	const int16_t * const audio_data,
 	const size_t num_samples,
 	const unsigned short num_channels,
-	const bool is_first_track,
-	const bool is_last_track);
+	const unsigned track_type);
 
 /* calculate version 1 and version 2 checksum of a subrange in a larger set of PCM_s16le data */
 static inline
@@ -97,8 +107,7 @@ int __unused accuraterip_checksum_sub(
 	const size_t start_sample,
 	const size_t num_samples,
 	const unsigned short num_channels,
-	const bool is_first_track,
-	const bool is_last_track)
+	const unsigned track_type)
 {
 	assert( num_samples > 0 );
 	assert( tot_samples > 0 );
@@ -107,8 +116,7 @@ int __unused accuraterip_checksum_sub(
 	return accuraterip_checksum(
 			checksum_v1, checksum_v2,
 			audio_data + start_sample*num_channels, num_samples,
-			num_channels,
-			is_first_track, is_last_track);
+			num_channels, track_type );
 }
 
 #endif

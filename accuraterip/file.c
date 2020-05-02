@@ -49,6 +49,8 @@ sndbuff_t fill_sndbuf(const soundfile_t soundfile,
     const SF_INFO * const sf_info = &soundfile.info;
     sndbuff_t sndbuf = {0,NULL};
 
+    assert(sf_info->channels==2);
+
     /* seek to the starting position */
     /* Note: seek uses 2-channel samples, so seek of 1 means skip 32 bits */
     if (sf_seek(soundfile.fd, start, SEEK_SET)<0)

@@ -4,19 +4,19 @@
 #include <string.h>
 #include <stdio.h>
 
-samplenum_t parse_time(const char * const time_str, const size_t buff_size)
+samplenum_t parse_time(const char * const time_str, const size_t buf_size)
 {
     /* We're going to parse a time input string
-     * These strings can be either in the form "<samples>s" to specifiy a fixed number of samples
+     * These strings can be either in the form "<samples>s" to specify a fixed number of samples
      * right away, or in the form "[[<min>:]<sec>:]<frames>" to specify minutes, seconds, and frames.
      * Note: 4 bytes (16 bits x 2 channels) in a sample, 588 samples in a frame, 75 frames in a second
      */
 
     /* copy the string to a local buffer, to make sure it's NULL-terminated */
-    char buff[buff_size+1];
+    char buff[buf_size + 1];
     memset(buff, 0, sizeof(buff));
-    strncpy(buff, time_str, buff_size);
-    buff[buff_size] = '\0';
+    strncpy(buff, time_str, buf_size);
+    buff[buf_size] = '\0';
 
     /* pointer to current position in buffer */
     char *p1, *p2, *p3;

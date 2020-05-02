@@ -2,25 +2,30 @@
 
 #include <stdio.h>
 #include <getopt.h>
+#include <stdarg.h>
 
 #define N 255
 
 bool VERBOSE = false;
 
-int help(const char * const error)
+int help(const char * const error, ...)
 {
 	if (error!=NULL)
 	{
-		printf("ERROR: %s\n\n", error);
+	    printf("ERROR: ");
+
+        va_list args;
+        va_start(args, error);
+        vprintf(error, args);
+        va_end(args);
+
+		printf("\n\n");
 	}
 	printf("Syntax: accuraterip [-v] [-f] [-l] <filename.wav> [<start1>[,<length1>] [<start2>[,<length2>] ...]] \n");
 	printf("\n");
 	printf("Available options:\n");
 	printf("  --first (-f)   : track is first on disc (first 5 frames are ignored)\n");
 	printf("  --last (-l)    : track is last on disc (final 5 frames are ignored)\n");
-#if OBSOLETE_IMPLEMENTATIONS
-	printf("  --test (-t)    : show lots of test output (different variations of checksums)\n");
-#endif
 	printf("  --verbose (-v) : show verbose output\n");
 	printf("\n");
 	printf("<startN>  :  start time of Nth track in file (default: start of file)\n");
@@ -39,18 +44,15 @@ int help(const char * const error)
 }
 
 opts_t parse_args(const int argc, char ** argv) {
-    opts_t opts = {NULL, false, 1, {{0, -1, false, false}}};
+    opts_t opts = {NULL, 0L, 1, {{0, -1, NORMAL_TRACK}}};
 
     const char *const short_options = "hflvt";
     const struct option long_options[] =
             {
-                    {"help", no_argument, NULL, 'h'},
-                    {"verbose", no_argument, NULL, 'v'},
-#if OBSOLETE_IMPLEMENTATIONS
-                    {"test",    no_argument, NULL, 't'},
-#endif
-                    {"first", no_argument, NULL, 'f'},
-                    {"last", no_argument, NULL, 'l'},
+                    {"help",    no_argument,       NULL, 'h'},
+                    {"verbose", no_argument,       NULL, 'v'},
+                    {"first",   no_argument,       NULL, 'f'},
+                    {"last",    no_argument,       NULL, 'l'},
                     {NULL, 0, NULL, 0},
             };
 
@@ -74,18 +76,14 @@ opts_t parse_args(const int argc, char ** argv) {
             case 'v':
                 VERBOSE = true;
                 break;
-#if OBSOLETE_IMPLEMENTATIONS
-            case 't':
-                opts.test = true;
                 break;
-#endif
             /* note: specifying -f/-l and multiple tracks doesn't make sens;
              * this is handled below, after parsing all arguments */
             case 'f':
-                opts.tracks[0].is_first_track = true;
+                opts.tracks[0].track_type |= FIRST_TRACK;
                 break;
             case 'l':
-                opts.tracks[0].is_last_track = true;
+                opts.tracks[0].track_type |= LAST_TRACK;
                 break;
             default:
                 help("Unknown option specified");
@@ -129,12 +127,12 @@ opts_t parse_args(const int argc, char ** argv) {
     {
         /* check if the user specified -l or -f, which doesn't make sense if
          * he also specified more than one track */
-        if (opts.tracks[0].is_first_track || opts.tracks[0].is_last_track)
+        if (opts.tracks[0].track_type > 0)
         {
             help("Specifying both -f/-l and multiple tracks doesn't make sense");
         }
-        opts.tracks[0].is_first_track = true;
-        opts.tracks[opts.num_tracks-1].is_last_track = true;
+        opts.tracks[0].track_type |= FIRST_TRACK;
+        opts.tracks[opts.num_tracks-1].track_type |= LAST_TRACK;
     }
 
 
@@ -147,8 +145,8 @@ opts_t parse_args(const int argc, char ** argv) {
         debug("  - track %d: start %s (%"PRId64"), len %s (%"PRId64") (%c/%c)\n", i,
                 samplestostr(buff1, N, track->sample_start ), track->sample_start,
                 samplestostr(buff2, N, track->sample_length), track->sample_length,
-                track->is_first_track ? 'f' : '-',
-                track->is_last_track  ? 'l' : '-' );
+                is_first_track(track->track_type) ? 'f' : '-',
+                is_last_track(track->track_type)  ? 'l' : '-' );
     }
 
 	return opts;
