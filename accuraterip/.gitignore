@@ -2,6 +2,7 @@ test/full.wav
 test/short.wav
 test/short2.wav
 test/short3.wav
+test/shifted.wav
 CMakeFiles/
 CMakeCache.txt
 Makefile

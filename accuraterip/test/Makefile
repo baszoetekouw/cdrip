@@ -10,7 +10,7 @@ OBJS=accuraterip.o cmdline.o
 LIBS+=-lsndfile
 
 .PHONY: all
-all: short.wav short2.wav short3.wav
+all: full.wav short.wav short2.wav short3.wav shifted.wav
 
 .PHONY: test
 test: short.wav
@@ -33,3 +33,8 @@ short2.wav: full.wav
 
 short3.wav: full.wav
 	sox $< $@ trim 75 30
+
+# shift by 48 samples (==192 bytes)
+shifted.wav: full.wav
+	(ffmpeg -i $< -codec:a copy  -f s16le - | dd ibs=4 skip=48; dd if=/dev/zero ibs=4 count=48 conv=notrunc oflag=append) | ffmpeg -f s16le -ac 2 -i - -y $@
+

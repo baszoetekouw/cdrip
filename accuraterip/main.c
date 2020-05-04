@@ -12,7 +12,8 @@ int main(const int argc, char **argv)
     for (unsigned i=0; i<options.num_tracks; i++) {
         track_t track = options.tracks[i];
 
-        const sndbuff_t sndbuf = fill_sndbuf(soundfile, track.sample_start, track.sample_length);
+        const sndbuff_t sndbuf = fill_sndbuf_offset(soundfile,
+                track.sample_start, track.sample_length, options.offset);
 
         uint32_t crc_v1 = 0;
         uint32_t crc_v2 = 0;

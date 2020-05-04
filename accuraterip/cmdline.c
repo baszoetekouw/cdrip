@@ -21,11 +21,12 @@ int help(const char * const error, ...)
 
 		printf("\n\n");
 	}
-	printf("Syntax: accuraterip [-v] [-f] [-l] <filename.wav> [<start1>[,<length1>] [<start2>[,<length2>] ...]] \n");
+	printf("Syntax: accuraterip [-v] [-f] [-l] [-o <samples>] <filename.wav> [<start1>[,<length1>] [<start2>[,<length2>] ...]] \n");
 	printf("\n");
 	printf("Available options:\n");
 	printf("  --first (-f)   : track is first on disc (first 5 frames are ignored)\n");
 	printf("  --last (-l)    : track is last on disc (final 5 frames are ignored)\n");
+	printf("  --offset (-o)  : adjust offset of samples in audiofile (to correct for cd player offsets)\n");
 	printf("  --verbose (-v) : show verbose output\n");
 	printf("\n");
 	printf("<startN>  :  start time of Nth track in file (default: start of file)\n");
@@ -46,13 +47,14 @@ int help(const char * const error, ...)
 opts_t parse_args(const int argc, char ** argv) {
     opts_t opts = {NULL, 0L, 1, {{0, -1, NORMAL_TRACK}}};
 
-    const char *const short_options = "hflvt";
+    const char *const short_options = "hvflo:";
     const struct option long_options[] =
             {
                     {"help",    no_argument,       NULL, 'h'},
                     {"verbose", no_argument,       NULL, 'v'},
                     {"first",   no_argument,       NULL, 'f'},
                     {"last",    no_argument,       NULL, 'l'},
+                    {"offset",  required_argument, NULL, 'o'},
                     {NULL, 0, NULL, 0},
             };
 
@@ -76,6 +78,10 @@ opts_t parse_args(const int argc, char ** argv) {
             case 'v':
                 VERBOSE = true;
                 break;
+            case 'o':
+                opts.offset = strtol(optarg, NULL, 10);
+                if (labs(opts.offset)>MAX_OFFSET)
+                    help("Maximum supported offset is %li\n", MAX_OFFSET);
                 break;
             /* note: specifying -f/-l and multiple tracks doesn't make sens;
              * this is handled below, after parsing all arguments */

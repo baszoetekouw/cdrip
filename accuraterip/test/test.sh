@@ -30,6 +30,10 @@ SHORT2_V1_NORMAL=96dbf310
 SHORT3_V2_LAST=38c4e03c
 SHORT3_V1_LAST=ab7b4804
 
+SHIFTED_V2_NORMAL=671a7f47
+SHIFTED_V1_NORMAL=9496fdd7
+
+
 function comp() {
 	MSG=$1
 	OK1=$2
@@ -95,6 +99,18 @@ chksums=($(../accuraterip full.wav 30,20 50,25 75,30 | awk '{print $4, $5}'))
 comp "subset of full.wav (track 1)... " $SHORT_V1_FIRST   $SHORT_V2_FIRST   ${chksums[@]:0:2}
 comp "subset of full.wav (track 2)... " $SHORT2_V1_NORMAL $SHORT2_V2_NORMAL ${chksums[@]:2:2}
 comp "subset of full.wav (track 3)... " $SHORT3_V1_LAST   $SHORT3_V2_LAST   ${chksums[@]:4:2}
+
+
+# check offset handling
+chksums=($(../accuraterip -o0 full.wav | awk '{print $4, $5}'))
+comp "full.wav (middle track, shifted by 0)... " $FULL_V1_NORMAL $FULL_V2_NORMAL ${chksums[@]}
+
+chksums=($(../accuraterip -o0 shifted.wav | awk '{print $4, $5}'))
+comp "shifted.wav (middle track, shifted by 0)... " $SHIFTED_V1_NORMAL $SHIFTED_V2_NORMAL ${chksums[@]}
+
+chksums=($(../accuraterip -o48 shifted.wav | awk '{print $4, $5}'))
+comp "shifted.wav (middle track, shifted by 48)... " $FULL_V1_NORMAL $FULL_V2_NORMAL ${chksums[@]}
+
 
 
 echo "Finished"

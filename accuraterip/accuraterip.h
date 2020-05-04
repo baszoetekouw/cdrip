@@ -5,6 +5,8 @@
 #define true    1
 #define false   0
 
+#define UNUSED __attribute__((unused))
+
 //#define DEBUG
 
 #define BYTES_PER_SAMPLE     (4)
@@ -71,6 +73,7 @@ typedef struct {
 
 typedef struct {
     const char *filename;
+    long int offset;
     unsigned int num_tracks;
     track_t tracks[MAX_TRACKS];
 } opts_t;
@@ -86,7 +89,9 @@ soundfile_t open_sndfile(const char * const filename);
 int close_sndfile(soundfile_t * const soundfile);
 sndbuff_t fill_sndbuf(const soundfile_t soundfile,
                       const samplenum_t start, const samplenum_t len);
-
+sndbuff_t fill_sndbuf_offset(const soundfile_t soundfile,
+                             const samplenum_t start, const samplenum_t len,
+                             const samplenum_t offset);
 
 /* calculate version 1 and version 2 checksum of PCM_s16le data */
 int accuraterip_checksum(
