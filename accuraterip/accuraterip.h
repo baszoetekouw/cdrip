@@ -1,6 +1,13 @@
 #ifndef ACCURATERIP_H
 #define ACCURATERIP_H
 
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <sndfile.h>
+
 #define bool    _Bool
 #define true    1
 #define false   0
@@ -29,15 +36,6 @@
 #define MAX_SAMPLES (MAX_SECONDS*SAMPLES_PER_SECOND)
 
 #define MAX_OFFSET (5*SAMPLES_PER_SECOND-1)
-
-#include <inttypes.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <sndfile.h>
-
-
 
 extern bool VERBOSE;
 #define debug(a...) ({ if (VERBOSE) printf(a); })
