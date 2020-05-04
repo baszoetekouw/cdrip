@@ -25,9 +25,12 @@ int main(const int argc, char **argv)
             exit(-1);
         }
         char buf[32];
+        samplenum_t tracklen = track.sample_length;
+        if (tracklen<0) {
+            tracklen = soundfile.info.frames;
+        }
         printf("track%02u %s %9"PRIu64" %08x %08x\n", i+1,
-                samplestostr(buf, sizeof(buf), track.sample_length), track.sample_length,
-                crc_v1, crc_v2);
+                samplestostr(buf, sizeof(buf), tracklen), tracklen, crc_v1, crc_v2);
 
         free(sndbuf.samples);
     }
