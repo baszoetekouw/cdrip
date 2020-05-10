@@ -1,33 +1,31 @@
 #!./env/bin/python
 
-import pyudev
+#import pyudev
+#import sys
+#import time
 import voidrip
 from pathlib import Path
-#from pprint import pprint
+#from os import PathLike
+from pprint import pprint
 
-
-# wait until an audio cd is inserted and return the device name
-def wait_for_audiocd():
-	udev_context = pyudev.Context()
-	udev_monitor = pyudev.Monitor.from_netlink(udev_context)
-# 	udev_monitor.filter_by('cd')
-	for dev in iter(udev_monitor.poll, None):
-		print("{} ({}): {}".format(dev.device_node, dev.device_type, dev['ACTION']))
-		for prop in dev.__iter__():
-			print('    {}: {}'.format(prop, dev.get(prop)))
-		if     'ID_CDROM_CD'       in dev \
-	       and 'DISK_MEDIA_CHANGE' in dev \
-	       and 'ID_CDROM_MEDIA_CD' in dev:
-			return dev.device_node
-
-	# never reached
+cdrom_dev = Path("/dev/cdrom3")
 
 
 
 def main():
-	#while True:
-	#	print("Waiting for cd...")
-	#	devicename = wait_for_audiocd()
+	cdplayer = voidrip.CDPlayer(cdrom_dev)
+	#cdplayer.tray_open()
+	#time.sleep(1.0)
+
+	print("Waiting for cd...")
+	cdplayer.wait_for_disc()
+
+	print("Found media")
+
+	info = cdplayer.get_disc_info()
+	print(f"info: {info}")
+	return
+
 
 	#for devicename in ('/dev/cdrom0','/dev/cdrom1','/dev/cdrom2','/dev/cdrom3'):
 	#	print("Found cd on device %s" % devicename)
@@ -38,9 +36,9 @@ def main():
 	#	disc_id  = disc.id
 	#	disc_toc = disc.toc
 
-	ripper = voidrip.Ripper(device='/dev/cdrom1', tmpdir=Path('/tmp/cdtest'))
-	ripper.start()
-	return
+	#ripper = voidrip.Ripper(device='/dev/cdrom1', tmpdir=Path('/tmp/cdtest'))
+	#ripper.start()
+	#return
 
 	# disc_toc=None
 	# for disc_id in ('2k1hHt5KQPVEiNpm8hIdzqUnYQo-','prJeAorVFSTkgUPo2QKUK_agAIg-','53xaa33729k6Bz5JCNNtRsgydRE-','U_e_qZwjtNytOO9_hW.85msX76U-'):

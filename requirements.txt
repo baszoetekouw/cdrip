@@ -1,4 +1,5 @@
-discid==1.1.1
-musicbrainzngs==0.6
-pyudev
-git+https://github.com/cmlburnett/tocparser
+discid~=1.1.1
+pycdio~=2.1.0
+musicbrainzngs~=0.7.1
+pyudev~=0.22.0
+#git+https://github.com/cmlburnett/tocparser
