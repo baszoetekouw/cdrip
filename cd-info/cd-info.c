@@ -1,4 +1,6 @@
 /*
+   Copyright (C) 2020
+   Bas Zoetekouw <bas@debian.org>
    Copyright (C) 2003-2005, 2007-2008, 2011-2012, 2014
    Rocky Bernstein <rocky@gnu.org>
    Copyright (C) 1996, 1997, 1998  Gerd Knorr <kraxel@bytesex.org>
@@ -20,12 +22,21 @@
 /*
    CD Info - prints various information about a CD, and detects the type of
    the CD.
+   This is a modified version of the original cd-info.c tha is included in th cdio distribution.
+   You can get it at https://www.gnu.org/software/libcdio/
+
+   This version is had simplified options (read: none) and is only menat to output information about audio discs
+   for ripping and archival purposes.  This version outputs machine-readible json rather than unparseble junk like
+   the original.
+   Honestly, I would prfer using the pycdio python API, but that is unfortunately incomplete....
+
    */
 #include <stdio.h>
 #include <inttypes.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <linux/version.h>
 #include <linux/cdrom.h>
@@ -43,6 +54,9 @@
 #define err_exit(fmt, args...) \
 { fprintf(stderr, fmt, ##args); \
 	myexit(p_cdio, EXIT_FAILURE); };
+
+//#define json_kv(n,a,b) { for (int i=n; i>0; i--) printf(" "); printf("\"%s\": \"%s\",\n", (a), (b)); }
+//#define json_kv(a,b) { printf("\"%s\": \"%s\"", (a), (b)) }
 
 	void
 myexit(CdIo_t *cdio, int rc)
@@ -70,18 +84,56 @@ open_input(const char *psz_source)
 	return p_cdio;
 }
 
+void
+rstrip(char * str) {
+	char * p = str + strlen(str);
+	while (p>str && isspace(*(--p))) {
+		*p = '\0';
+	}
+}
+
 static void
-print_cdtext_track_info(cdtext_t *p_cdtext, track_t i_track, const char *psz_msg) {
+print_cdtext_track_info(cdtext_t *p_cdtext, track_t i_track, const char * indent) {
 
 	if (NULL != p_cdtext) {
 		cdtext_field_t i;
 
-		printf("%s\n", psz_msg);
-
 		for (i=0; i < MAX_CDTEXT_FIELDS; i++) {
-			if (cdtext_get_const(p_cdtext, i, i_track)) {
-				printf("\t%s: %s\n", cdtext_field2str(i), cdtext_get_const(p_cdtext, i, i_track));
+			char * str = cdtext_get(p_cdtext, i, i_track);
+			if (str) {
+				rstrip(str);
+				if (*str) {
+					printf("%s%s: '%s'\n", indent, cdtext_field2str(i), str);
+				}
 			}
+			free(str);
+		}
+	}
+}
+
+static void
+print_cdtext_track(cdtext_t *p_cdtext, track_t i_track, const char * indent) {
+	cdtext_lang_t *languages;
+	cdtext_genre_t genre;
+	char longerindent[128];
+
+	if (NULL == p_cdtext) {
+		return;
+	}
+
+	snprintf(longerindent, 127, "%s    ", indent);
+
+	printf("%scdtext:\n", indent);
+
+	languages = cdtext_list_languages(p_cdtext);
+	for(int i=0; i<8; i++)
+	{
+		if ( CDTEXT_LANGUAGE_UNKNOWN != languages[i]
+				&& cdtext_select_language(p_cdtext, languages[i]))
+		{
+			printf("%s  - lang_num: %u\n", indent, i);
+			printf("%s    lang: '%s'\n", indent, cdtext_lang2str(languages[i]));
+			print_cdtext_track_info(p_cdtext, i_track, longerindent);
 		}
 	}
 }
@@ -96,26 +148,31 @@ print_cdtext_info(CdIo_t *p_cdio, track_t i_tracks, track_t i_first_track) {
 	int i, j;
 
 	if(NULL == p_cdtext) {
-		printf("No CD-TEXT on Disc.\n");
 		return;
 	}
+
+	printf("cdtext:\n");
 
 	languages = cdtext_list_languages(p_cdtext);
 	for(i=0; i<8; i++)
 		if ( CDTEXT_LANGUAGE_UNKNOWN != languages[i]
 				&& cdtext_select_language(p_cdtext, languages[i]))
 		{
-			printf("\nLanguage %d '%s':\n", i, cdtext_lang2str(languages[i]));
+			printf("  - num: %u\n", i);
+			printf("    lang: '%s'\n", cdtext_lang2str(languages[i]));
+			printf("    disc:\n");
 
-			print_cdtext_track_info(p_cdtext, 0, "CD-TEXT for Disc:");
+			print_cdtext_track_info(p_cdtext, 0, "      ");
 			genre = cdtext_get_genre(p_cdtext);
-			if ( CDTEXT_GENRE_UNUSED != genre)
-				printf("\tGENRE_CODE: %d (%s)\n", genre, cdtext_genre2str(genre));
+			if ( CDTEXT_GENRE_UNUSED != genre) {
+				printf("      genre_code: %d\n", genre);
+				printf("      genre: '%s'\n", cdtext_genre2str(genre));
+			}
 
+			printf("    tracks:\n");
 			for ( j = i_first_track ; j < i_last_track; j++ ) {
-				char msg[50];
-				sprintf(msg, "CD-TEXT for Track %2d:", j);
-				print_cdtext_track_info(p_cdtext, j, msg);
+				printf("      %u:\n", j);
+				print_cdtext_track_info(p_cdtext, j, "        ");
 			}
 		}
 }
@@ -257,12 +314,17 @@ main(int argc, char *argv[])
 		}
 	}
 
-	printf("CD location   : %s\n",   source_name);
-	printf("CD driver name: %s\n",   cdio_get_driver_name(p_cdio));
-	printf("   access mode: %s\n\n", cdio_get_arg(p_cdio, "access-mode"));
+	printf("---\n");
+
+	printf("drive:\n");
+	{
+		printf("  device: '%s'\n", source_name);
+		printf("  driver: '%s'\n", cdio_get_driver_name(p_cdio));
+		printf("  access_mode: '%s'\n", cdio_get_arg(p_cdio, "access-mode"));
+	}
 
 	discmode = cdio_get_discmode(p_cdio);
-	printf("Disc mode is listed as: %s\n", discmode2str[discmode]);
+	printf("mode: '%s'\n", discmode2str[discmode]);
 
 	i_first_track = cdio_get_first_track_num(p_cdio);
 
@@ -276,35 +338,37 @@ main(int argc, char *argv[])
 		err_exit("Can't get number of tracks. I give up.%s\n", "");
 	}
 
-	printf("CD-ROM Track List (%i - %i)\n", i_first_track, i_tracks);
-
-	printf("  #: MSF       LSN    Type   Green? Copy?");
-	if ( CDIO_DISC_MODE_CD_DA == discmode
-			|| CDIO_DISC_MODE_CD_MIXED == discmode )
-		printf(" Channels Premphasis?");
-	printf("\n");
+	printf("num_tracks: %u\n", i_tracks);
+	printf("first_track: %u\n", i_first_track);
+	printf("tracks:\n");
 
 	start_track_lsn = cdio_get_track_lsn(p_cdio, i_first_track);
 
+	cdtext_t *p_cdtext = cdio_get_cdtext(p_cdio);
 	/* Read and possibly print track information. */
 	for (i = i_first_track; i <= CDIO_CDROM_LEADOUT_TRACK; i++) {
 		msf_t msf;
+		lsn_t lsn;
 		char *psz_msf;
 		track_format_t track_format;
 
 		if (!cdio_get_track_msf(p_cdio, i, &msf)) {
 			err_exit("cdio_track_msf for track %i failed, I give up.\n", i);
 		}
+		if (CDIO_INVALID_LSN==(lsn = cdio_get_track_lsn(p_cdio, i))) {
+			err_exit("cdio_track_lsn for track %i failed, I give up.\n", i);
+		}
 
 		track_format = cdio_get_track_format(p_cdio, i);
 		psz_msf = cdio_msf_to_str(&msf);
 		if (i == CDIO_CDROM_LEADOUT_TRACK) {
-			lsn_t lsn= cdio_msf_to_lsn(&msf);
 			long unsigned int i_bytes_raw = lsn * CDIO_CD_FRAMESIZE_RAW;
 			long unsigned int i_bytes_formatted = lsn - start_track_lsn;
 
-			printf( "%3d: %8s  %06lu leadout ", (int) i, psz_msf,
-					(long unsigned int) lsn );
+			printf("  - track: %u\n", i);
+			printf("    type: leadout\n");
+			printf("    start: %u\n", lsn);
+			printf("    start_msf: '%s'\n", psz_msf);
 
 			switch (discmode) {
 				case CDIO_DISC_MODE_DVD_ROM:
@@ -328,76 +392,73 @@ main(int argc, char *argv[])
 					i_bytes_formatted *= CDIO_CD_FRAMESIZE_RAW;
 			}
 
-			if (i_bytes_raw < 1024)
-				printf( "(%lu bytes", i_bytes_raw );
-			if (i_bytes_raw < 1024 * 1024)
-				printf( "(%lu KB", i_bytes_raw / 1024 );
-			else
-				printf( "(%lu MB", i_bytes_raw / (1024 * 1024) );
-
-			printf(" raw, ");
-			if (i_bytes_formatted < 1024)
-				printf( "%lu bytes", i_bytes_formatted );
-			if (i_bytes_formatted < 1024 * 1024)
-				printf( "%lu KB", i_bytes_formatted / 1024 );
-			else
-				printf( "%lu MB", i_bytes_formatted / (1024 * 1024) );
-
-			printf(" formatted)\n");
+			printf("    bytes_raw: %lu\n", i_bytes_raw);
+			printf("    bytes_formatted: %lu\n", i_bytes_formatted);
 
 			free(psz_msf);
 			break;
 		} else {
 			const char *psz;
-			printf( "%3d: %8s  %06lu %-6s %-5s  ", (int) i, psz_msf,
-					(long unsigned int) cdio_msf_to_lsn(&msf),
-					track_format2str[track_format],
-					cdio_get_track_green(p_cdio, i)? "true " : "false");
+			printf("  - track: %u\n", i);
+			printf("    type: '%s'\n", track_format2str[track_format]);
+			printf("    start: %u\n", lsn);
+			printf("    start_msf: '%s'\n", psz_msf);
+			printf("    green: %s\n", cdio_get_track_green(p_cdio, i)? "true " : "false");
 
 			switch (cdio_get_track_copy_permit(p_cdio, i)) {
 				case CDIO_TRACK_FLAG_FALSE:
-					psz="no";
+					psz="false";
 					break;
 				case CDIO_TRACK_FLAG_TRUE:
-					psz="yes";
+					psz="true";
 					break;
 				case CDIO_TRACK_FLAG_UNKNOWN:
-					psz="?";
+					psz="unknown";
 					break;
 				case CDIO_TRACK_FLAG_ERROR:
 				default:
-					psz="error";
+					err_exit("error while reading copy permit for track %u", i);
 					break;
 			}
-			printf("%-5s", psz);
+			printf("    permit_copy: '%s'\n", psz);
 
 			if (TRACK_FORMAT_AUDIO == track_format) {
 				const int i_channels = cdio_get_track_channels(p_cdio, i);
 				switch (cdio_get_track_preemphasis(p_cdio, i)) {
 					case CDIO_TRACK_FLAG_FALSE:
-						psz="no";
+						psz="false";
 						break;
 					case CDIO_TRACK_FLAG_TRUE:
-						psz="yes";
+						psz="true";
 						break;
 					case CDIO_TRACK_FLAG_UNKNOWN:
-						psz="?";
+						psz="unknown";
 						break;
 					case CDIO_TRACK_FLAG_ERROR:
 					default:
-						psz="error";
+						err_exit("error while reading preemphasis for track %u", i);
 						break;
 				}
+				printf( "    preemphasis: '%s'\n", psz);
+
+
 				if (i_channels == -2)
-					printf(" %-8s", "unknown");
-				else if (i_channels == -1)
-					printf(" %-8s", "error");
+					printf("    channels: '%s'\n", "unknown");
+				else if (i_channels > 0)
+					printf("    channels: %u", i_channels);
 				else
-					printf(" %-8d", i_channels);
-				printf( " %s", psz);
+					err_exit("error while reading number of channels for track %u", i);
 			}
 
 			printf( "\n" );
+
+			isrc = cdio_get_track_isrc(p_cdio, i);
+			if (NULL != isrc) {
+				printf("    isrc: '%s'\n", isrc);
+				cdio_free(isrc);
+			}
+
+			print_cdtext_track(p_cdtext, i, "    ");
 
 		}
 		free(psz_msf);
@@ -415,52 +476,37 @@ main(int argc, char *argv[])
 
 	if (cdio_is_discmode_cdrom(discmode)) {
 		/* get and print MCN */
-		printf("Media Catalog Number (MCN): ");
+		printf("mcn: ");
 
 		media_catalog_number = cdio_get_mcn(p_cdio);
 
 		if (NULL == media_catalog_number) {
 			if (i_read_cap & CDIO_DRIVE_CAP_READ_MCN)
-				printf("not available\n");
+				printf("'not available'\n");
 			else
-				printf("not supported by drive/driver\n");
+				printf("'not supported by drive/driver'\n");
 		} else {
-			printf("%s\n", media_catalog_number);
+			printf("'%s'\n", media_catalog_number);
 			cdio_free(media_catalog_number);
-		}
-
-		/* get and print track ISRCs */
-
-		{
-			for (i = first_audio; i < first_audio + num_audio; i++) {
-				isrc = cdio_get_track_isrc(p_cdio, i);
-
-				if (NULL != isrc) {
-					printf("TRACK %2d ISRC: %s\n", i, isrc);
-					cdio_free(isrc);
-				}
-			}
 		}
 
 		/* List number of sessions */
 		{
 			lsn_t i_last_session;
-			printf("Last CD Session LSN: ");
+			printf("last_session: ");
 			if (DRIVER_OP_SUCCESS == cdio_get_last_session(p_cdio, &i_last_session))
 			{
 				printf("%d\n", i_last_session);
 			} else {
 				if (i_misc_cap & CDIO_DRIVE_CAP_MISC_MULTI_SESSION)
-					printf("failed\n");
+					printf("'failed'\n");
 				else
-					printf("not supported by drive/driver\n");
+					printf("'not supported by drive/driver'\n");
 			}
 		}
 	}
 
 	{
-		printf("CD Analysis Report\n");
-
 		/* try to find out what sort of CD we have */
 		if (num_audio > 0) {
 			/* may be a "real" audio CD or hidden track CD */
@@ -487,6 +533,8 @@ main(int argc, char *argv[])
 		if (num_data > 0) {
 			/* we have data track(s) */
 			int j;
+
+			printf("data:\n");
 
 			for (j = 2, i = first_data; i <= i_tracks; i++) {
 				msf_t msf;
@@ -521,12 +569,11 @@ main(int argc, char *argv[])
 				if (i > 1) {
 					/* track is beyond last session -> new session found */
 					ms_offset = start_track_lsn;
-					printf( "session #%d starts at track %2i, LSN: %lu,"
-							" ISO 9660 blocks: %6i\n",
-							j++, i, (unsigned long int) start_track_lsn,
-							cdio_iso_analysis.isofs_size);
-					printf( "ISO 9660: %i blocks, label `%.32s'\n",
-							cdio_iso_analysis.isofs_size, cdio_iso_analysis.iso_label);
+					printf("  - session: %u\n", j++);
+					printf("    track: %u\n", i);
+					printf("    start: %i\n", start_track_lsn);
+					printf("    iso9660_blocks: %i\n", cdio_iso_analysis.isofs_size);
+					printf("    iso9660_label: '%s'\n", cdio_iso_analysis.iso_label);
 					fs |= CDIO_FS_ANAL_MULTISESSION;
 				} else {
 					print_analysis(ms_offset, cdio_iso_analysis, fs, first_data,
