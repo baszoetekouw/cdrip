@@ -1,7 +1,8 @@
-.idea
+.idea/
 env
 venv
 *.o
 accuraterip/accuraterip
 .mypy_cache
 __pycache__
+.DS_Store

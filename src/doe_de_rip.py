@@ -3,13 +3,13 @@
 #import pyudev
 #import sys
 #import time
+#import json
 import voidrip
 from pathlib import Path
 #from os import PathLike
-from pprint import pprint
+#from pprint import pprint
 
-cdrom_dev = Path("/dev/cdrom3")
-
+cdrom_dev = Path("/dev/cdrom1")
 
 
 def main():
@@ -22,8 +22,11 @@ def main():
 
 	print("Found media")
 
-	info = cdplayer.get_disc_info()
-	print(f"info: {info}")
+	#info = cdplayer.info
+	#print(json.dumps(info, sort_keys=True, indent=4))
+
+	disc = cdplayer.get_disc()
+	print(disc.as_json())
 	return
 
 
@@ -41,7 +44,8 @@ def main():
 	#return
 
 	# disc_toc=None
-	# for disc_id in ('2k1hHt5KQPVEiNpm8hIdzqUnYQo-','prJeAorVFSTkgUPo2QKUK_agAIg-','53xaa33729k6Bz5JCNNtRsgydRE-','U_e_qZwjtNytOO9_hW.85msX76U-'):
+	# for disc_id in ('2k1hHt5KQPVEiNpm8hIdzqUnYQo-','prJeAorVFSTkgUPo2QKUK_agAIg-',
+	#                 '53xaa33729k6Bz5JCNNtRsgydRE-','U_e_qZwjtNytOO9_hW.85msX76U-'):
 	# 	release_info = voidrip.rip.fetch_musicbrainz(disc_id,disc_toc)
 	# 	if not release_info:
 	# 		print("Disc not found or stub found in Musicbrainz")
@@ -50,7 +54,7 @@ def main():
 	# 	disc_info = voidrip.rip.parse_release_info(release_info)
 	# 	voidrip.rip.print_disc_info(disc_info)
 	# 	#eject(devicename)
-    #
+	#
 	# 	print("\n===\n")
 	# 	continue
 

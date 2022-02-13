@@ -1,85 +1,72 @@
+import json
 import os
-import string
 import tempfile
 #from pprint import pprint
-import discid
+from os import PathLike
+from pathlib import Path
+from datetime import datetime
+from typing import Optional
+
 from pprint import pprint
 from . import cdplayer
 from . import cd
 from . import audiorip
-from .tools import execcmd
 
 class CDException(Exception): pass
 
 class VoidRip:
-	def __init__(self, device : string ='/dev/cdrom', tmpdir : os.PathLike = None):
-		self._name = 'voidrip'
-		self._cdplayer = cdplayer.CDPlayer(device)
-		self._tmpdirobj = None
+	def __init__(self, device : PathLike = Path('/dev/cdrom'), tmpdir : PathLike = None):
+		self._name : str = 'voidrip'
+		self._cdplayer : cdplayer = cdplayer.CDPlayer(device)
+		self._tmpdir : os.PathLike = tmpdir
 		if tmpdir is None:
-			self._tempdirobj = tempfile.TemporaryDirectory(prefix=f'{self._name}_')
-			self._tempdir = self._tempdirobj.name
-		else:
-			self._tempdir = tmpdir
-		self._audiorip = audiorip.AudioRip(cd=self._cdplayer, destdir=self._tempdir)
-		self._disc = cd.Disc
+			self._tempdir = tempfile.TemporaryDirectory(prefix=f'{self._name}_{self._cdplayer.device.stem}')
+		self._audiorip : audiorip = audiorip.AudioRip(cd=self._cdplayer, destdir=self._tempdir.name)
+		self._disc : Optional[cd.Disc] = None
 
 	def get_path(self,filename : str) -> str:
-		return os.path.join(self._tempdir, filename)
+		return os.path.join(self._tempdir.name, filename)
 
 	def start(self) -> None:
+		logs = ''
+		date_start = datetime.now()
+
 		print("Closing tray")
 		self._cdplayer.tray_close()
-		if self._cdplayer.has_disc():
-			self.fetch_cd_info()
-			#self._audiorip.rip_fast_fullcd()
-			self.correct_offset()
-			self.check_accuraterip()
-			self.fetch_metadata()
-		else:
+		if ~self._cdplayer.has_disc():
 			print("No disc detected")
+			self._cdplayer.tray_open()
+			return
+
+		self.fetch_cd_info()
+
+		#self._audiorip.rip_fast_fullcd()
+		#self._audiorip.correct_offset()
+		#self.check_accuraterip()
+
+		date_finish = datetime.now()
+		metdadata = {
+			"rip": {
+				"ripper": "voidrip",
+				"version": "0.1",
+				"date": date_finish,
+				"rip_duration": date_finish-date_start,
+				"stdout": logs
+			},
+			"cdplayer": self.player_info(),
+			"disc": self._disc
+		}
+		print(json.dumps(metdadata))
+
 		self._cdplayer.tray_open()
 
 	def fetch_cd_info(self):
-		# calc cddb id
-		self._disc = discid.read(device=self._cdplayer.devicename, features=discid.FEATURES_IMPLEMENTED)
+		if self._disc is None:
+			self._disc = self._cdplayer.get_disc()
 		pprint(self._disc)
 
-	def correct_offset(self):
-		raw_spec = ['-t', 'raw', '--endian', 'big',    '-b16', '-e', 'signed', '-c2', '-r44100']
-		wav_spec = ['-t', 'wav', '--endian', 'little', '-b16', '-e', 'signed', '-c2', '-r44100']
-
-		# calculate offset in seconds
-		# let's just hope the offset is always <60 seconds
-		offset_seconds = abs(self._cdplayer.offset/44100)
-		if offset_seconds>=60:
-			raise NotImplementedError("Offsets >60s are not supported")
-
-		# wav conversion
-		trim_spec = []
-		if self._cdplayer.offset>0:
-			trim_spec = ['trim',f'{offset_seconds:.6f}']
-		elif self._cdplayer.offset<0:
-			trim_spec = ['trim','0',f'-{offset_seconds:.6f}']
-		execcmd('sox',raw_spec+['cdrdao.raw', '-t', 'wav', 'cdrdao.wav']+trim_spec, cwd=self._tempdir)
-
-		if self._cdplayer.offset==0:
-			# copy wav as-is
-			os.link(self.get_path('cdrdao.wav'), self.get_path('cd.wav'))
-		else:
-			# generate silence
-			execcmd('sox',[
-				'-t', 's16', '--endian', 'big', '-c2', '-r44100', '/dev/zero',
-				'stilte.wav',
-				'trim', '0',f'{offset_seconds:.6f}'
-			], cwd=self._tempdir)
-
-			if self._cdplayer.offset>0:
-				# append silence
-				execcmd('sox',['cdrdao.wav','stilte.wav']+wav_spec+['cd.wav'], cwd=self._tempdir)
-			else:
-				# prepend silence
-				execcmd('sox',['stilte.wav','cdrdao.wav']+wav_spec+['cd.wav'], cwd=self._tempdir)
+	def player_info(self):
+		return self._cdplayer.metadata()
 
 	def check_accuraterip(self):
 		# fetch accuraterip cd
@@ -96,17 +83,3 @@ class VoidRip:
 		#     write new full disk wav
 		pass
 
-	def fetch_metadata(self):
-		# fetch metadata from musicbrainz
-		# if found 1 match:
-		#   use match
-		# elif found >1 match:
-		#   show results to use, ask choice
-		# elif found stub:
-		#   show stub url
-		# elif not found:
-		#   ask for artist/title/year
-		#   submit stub
-		#   show stub url
-		# save metadata in metadata file
-		pass

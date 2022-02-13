@@ -2,11 +2,11 @@ CFLAGS+=-Wall -Wextra -Werror
 CFLAGS+=--std=c99
 CFLAGS+=-O3
 CFLAGS+=-ggdb3
-CFLAGS+=-fstack-check
+#CFLAGS+=-fstack-check
 CFLAGS+=-march=native
 
 
-OBJS=accuraterip.o cmdline.o
+OBJS=accuraterip.o cmdline.o util.o file.o main.o
 LIBS+=-lsndfile
 
 .PHONY: all

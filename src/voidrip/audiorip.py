@@ -17,63 +17,94 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-import tocparser
+#import tocparser
 from os import PathLike
-from typing import Union
+from typing import Union, Optional, List
 from pathlib import Path
 
 from . import cdplayer
 from . import tools
-from .cd import Disc
 
 
 # this class handles the actual ripping from cd to audio file
+# all intermediate files are stored as raw 16 bit signed samples (at 44.1kHz)
 
 class AudioRip:
 	COMMANDS = {
-		'cdrdao': '/usr/bin/cdrdao',
-		'cdparanoia': '/usr/bin/cdparano1ia',
-		'sox': '/usr/bin/sox',
+		'cdrdao': Path('/usr/bin/cdrdao'),
+		'cdparanoia': Path('/usr/bin/cdparano1ia'),
+		'sox': Path('/usr/bin/sox'),
 	}
+	sox_raw_spec = ['-t', 'raw', '--endian', 'big',    '-b16', '-esigned', '-c2', '-r44100']
+	sox_wav_spec = ['-t', 'wav', '--endian', 'little', '-b16', '-esigned', '-c2', '-r44100']
 
 	def __init__(self, cd : cdplayer.CDPlayer, destdir: PathLike) -> None:
 		self._cdplayer: cdplayer.CDPlayer = cd
-		self._destdir: PathLike = destdir
-		self._disc : Disc = Disc()
+		self._destdir: Path = Path(destdir)
 
 	@property
-	def cd(self):
+	def cd(self) -> cdplayer.CDPlayer:
 		return self._cdplayer
 
-	@property
-	def disc(self):
-		return self._disc
+	#@property
+	#def disc(self) -> Disc:
+	#	return self._disc
 
 	@property
-	def cwd(self):
+	def cwd(self) -> Path:
 		return self._destdir
 
 	def path(self, name: Union[PathLike,str]) -> Path:
 		return Path(self._destdir, name)
 
-	def rip(self,output):
+	def rip(self, output) -> None:
 		# https://github.com/thomasvs/morituri/blob/master/examples/readdisc.py./con
 		pass
 
+	def exec(self, command: str, args: List[str], cwd: Optional[PathLike] = None):
+		if cwd is None:
+			cwd = self.cwd
+		tools.execcmd(self.COMMANDS[command], args, cwd)
+
 	def rip_fast_fullcd(self) -> None:
 		# cdrdao
-		tools.execcmd(
-			cmd='cdrdao',
-			args=['read-cd', '--datafile', 'cdrdao.raw', '--device', self.cd.devicename, 'cdrdao.toc'],
+		tools.execcmd(self.COMMANDS['cdrdao'], [
+			'read-cd',
+			'--datafile', 'cdrdao.raw',
+			'--paranoia-mode=2',
+			'--device', self.cd.devicename,
+			'cdrdao.toc'],
 			cwd=self.cwd
 		)
-		self.disc.rawfile = self.path('cdrdao.raw')
-		self.disc.toc = tocparser.TOC.load(self.path('cdrdao.toc'))
+		#self._disc = Disc(self.path('cdrdao.toc'), self.path('cdrdao.raw'))
 
 	def rip_accurate_track(self, track: int) -> PathLike:
 		# cdparanoia
 		outputfile = Path(f'cdparanoia_{track:02d}.wav')
-		tools.execcmd('cdparanoia', ['--output-wav', '--force-cdrom-device', self.cd.devicename, '--sample-offset',
-		                         f'{self.cd.offset:d}', f'{track:d}', outputfile])
+		self.exec('cdparanoia', [
+			'--output-wav', '--force-cdrom-device', self.cd.devicename,
+			'--sample-offset', f'{self.cd.offset:d}', f'{track:d}',
+			outputfile
+		])
 		return outputfile
 
+	def correct_offset(self):
+		# examples:
+		#   add 294 samples at the start: sox new.wav padded1.wav  trim 0 -294s  pad 294s 0
+		#   add 294 samples at the end:   sox new.wav padded2.wav  trim    294s  pad 0 294s
+
+		# Positive correction means: drive reads samples too soon, so samples need to be shifted
+		# forwards in time
+		correction = self.cd.offset
+		if correction > 0:
+			trim_spec = ['trim', '0', f'-{correction}s',     'pad', f'{correction}s', '0']
+		elif correction < 0:
+			trim_spec = ['trim',      f'{abs(correction)}s', 'pad', '0', f'{correction}s']
+		else:
+			trim_spec = []
+
+		self.exec('sox',
+			self.sox_raw_spec + ['cdrdao.raw'] +
+			self.sox_raw_spec + ['cdrdao_shifted.raw'] +
+			trim_spec
+		)

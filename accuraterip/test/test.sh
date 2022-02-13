@@ -53,6 +53,18 @@ function comp() {
 }
 
 
+# check wav files
+sha256sum --check <<EOF
+e5f2b25ae2761e36505aff0c467106868a17ed1e856a9c1f26b0726e936bb3e2  full.wav
+f5b265107db66510d89b6a18c04f55dec0dfbee0f7f729a6634c0cab3e51979e  shifted.wav
+20d0d5e7de68e998eb336f190ed4891b20c114c37a289611119b14794d28c3b6  short2.wav
+5db94a4738eaf64370f38818472150762760c2e4f5336aec7096f67c19e11804  short3.wav
+0e47251cc80f9eab0756afc4f7c6736b7046b8b9f974cb88d0848c1d0c6a7fa1  short.wav
+150331e03842a8362ae6656f3e543d4ff58899181d357a549be74c9d0646be87  test1.wav
+c6c3bc34db4462079ea9a9f7734ad70ea0f328a36e7e7942734081c67acfb33f  test2.wav
+EOF
+
+
 # check full file
 chksums=($(../accuraterip full.wav | awk '{print $4, $5}'))
 comp "full.wav (middle track)... " $FULL_V1_NORMAL $FULL_V2_NORMAL ${chksums[@]}

@@ -1,15 +1,20 @@
 import os
 from pathlib import Path
 import fcntl
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, Any
 from os import PathLike
-import enum
+#import enum
 import time
 import pyudev
+import yaml
+
+from . import tools
+from . import cd
+from .cd import Track
 
 # todo: replace low-level ioctls by udev calls or cdio
 import cdio
-import pycdio
+#import pycdio
 
 class CDPlayerException(Exception):
 	pass
@@ -31,53 +36,6 @@ def msn(lsn: int) -> str:
 	lsn -= block * sam_per_blk
 
 	return f"{minute:02u}:{second:02u}:{block:02u}.{lsn:03u}"
-
-
-class TrackFormat(enum.Enum):
-	AUDIO = 'audio'
-	MODE1 = 'mode1'
-	MODE2 = 'mode2'
-
-
-class Track:
-	@staticmethod
-	def parse_preemphasis(preemphasis: int) -> Optional[bool]:
-		if preemphasis == 0:
-			return False
-		if preemphasis == 1:
-			return True
-		if preemphasis == 3:
-			return None
-		raise CDPlayerException(f"Unknown preemphasis value '{preemphasis}'")
-
-
-
-	def __init__(self, track: cdio.Track):
-		self.num: int = track.track
-		self.first_lsn: int = track.get_lsn()
-		self.last_lsn: int = track.get_last_lsn()
-		self.channels: int = track.get_audio_channels()
-		self.format: TrackFormat = TrackFormat(track.get_format())
-		self.copy_permit: bool = track.get_copy_permit() == 'OK'
-		# note: we would use track.get_preemphasis, but it has a bug and doesn't currenty work
-		self.preemphasis: Optional[bool] = Track.parse_preemphasis(
-			pycdio.get_track_preemphasis(track.device, track.track))
-		#self.isrc: Optional[str] = track.device.
-
-		if self.format != TrackFormat.AUDIO:
-			raise CDPlayerException(f"Found track {self.num} with unsupported mode {self.format}")
-
-	def __repr__(self):
-		s = f"<{self.__class__.__name__}\n"
-		for k, v in { **vars(self), **dict(length=self.length) }.items():
-			s += f"  {k}: {v}\n"
-		s += ">"
-		return s
-
-
-	@property
-	def length(self) -> int:
-		return self.last_lsn - self.first_lsn + 1
 
 
 class CDPlayer:
@@ -102,20 +60,23 @@ class CDPlayer:
 	# see http://www.accuraterip.com/driveoffsets.htm for the list
 	# see https://hydrogenaud.io/index.php/topic,47862.msg425948.html#msg425948 for explanation
 	OFFSETS = {
-		('PIONEER','DVD-RW  DVR-110D'): 48,
-		('Optiarc','DVD RW AD-5260S' ): 48,
-		('ATAPI',  'DVD A DH16A6S'   ):  6,
-		('hp',     'DVD_A_DH16AESH'  ):  6,
+		('PIONEER', 'DVD-RW  DVR-110D'):  48,
+		('Optiarc', 'DVD RW AD-5260S' ):  48,
+		('ATAPI',   'DVD A DH16A6S'   ):   6,
+		('hp',      'DVD_A_DH16AESH'  ):   6,
+		('hp',      'DVD-RAM GH40L'   ): 667,
+		('HL-DT-ST','DVDRAM GH24NSD1' ):   6
 	}
 
 
 
-	def __init__(self,device: PathLike='/dev/cdrom') -> None:
+	def __init__(self, device: PathLike='/dev/cdrom') -> None:
 		self._dev_path: Path = Path(device).resolve()
 		self._udev_context: pyudev.Context = pyudev.Context()
 		self._udev_device: pyudev.Device = pyudev.Devices.from_device_file(self._udev_context, str(self._dev_path))
 
-		self._device = cdio.Device(str(self._dev_path))
+		self._device: cdio.Device = cdio.Device(str(self._dev_path))
+		self._cdinfo = None
 
 		# sanity checks
 		try:
@@ -125,6 +86,13 @@ class CDPlayer:
 				raise CDPlayerException(f"Device `{self.device}' is not a block device")
 			else:
 				raise CDPlayerException(f"Can't open device `{self.device}'")
+
+	def metadata(self) -> Dict:
+		return {
+			"device": self.device.name,
+			"model": self.get_model(),
+			"offset": self.offset
+		}
 
 	@property
 	def device(self) -> Path:
@@ -250,16 +218,12 @@ class CDPlayer:
 			tracks.append(Track(track))
 		return tracks
 
-	def get_disc_info(self) -> Dict[str,str]:
-		return dict(
-			mode           = self._device.get_disc_mode(),
-			track_first   = self.firsttrack,
-			last_track    =  self.lasttrack,
-			mcn           = self.get_disc_mcn(),
-			tracks        = self.get_tracks(),
-			cdtext_disc   = self.get_cdtext(0),
-			cdtext_tracks = [self.get_cdtext(t) for t in self.tracks]
-		)
+	@property
+	def info(self) -> Dict[str,Any]:
+		if self._cdinfo is None:
+			yml = tools.execcmd(Path(tools.script_dir().parent,"cd-info","cd-info"), [str(self._dev_path)]).stdout
+			self._cdinfo = yaml.safe_load(yml)
+		return self._cdinfo
 
 	def get_disc_mcn(self) -> Optional[str]:
 		mcn = self._device.get_mcn()
@@ -269,14 +233,10 @@ class CDPlayer:
 		track = self._device.get_track(track_num)
 		return Track(track)
 
-	def get_cdtext(self, track: int) -> Dict[str,str]:
-		cdtext: Dict[str, str] = {}
-		for field in range(pycdio.MIN_CDTEXT_FIELD, pycdio.MAX_CDTEXT_FIELDS + 1):
-			value: str = self._device.get_cdtext().get(field, track)
-			# value can be empty but exist, compared to NULL values
-			if value and value.rstrip():
-				cdtext[pycdio.cdtext_field2str(field)] = value
-		return cdtext
+
+	def get_disc(self) -> cd.Disc:
+		disc = cd.Disc(self._device)
+		return disc
 
 
 

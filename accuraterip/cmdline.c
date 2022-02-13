@@ -105,13 +105,13 @@ opts_t parse_args(const int argc, char ** argv) {
     {
         opts.num_tracks = 0;
         /* process optional track spec (<start>,<length>) */
-        for (unsigned int i = optind + 1; i < argc; i++) {
+        for (int i = optind + 1; i < argc; i++) {
             /* we found a new track */
             opts.num_tracks++;
             track_t *const track = &opts.tracks[opts.num_tracks - 1];
 
             char buff[N];
-            strncpy(buff, argv[i], N);
+            strncpy(buff, argv[i], N-1);
             /* should be <start>,<length> so find position of comma */
             char *len_part = strchr(buff, ',');
             if (len_part != NULL) {
@@ -144,7 +144,7 @@ opts_t parse_args(const int argc, char ** argv) {
 
 	debug("Input filename: '%s'\n", opts.filename);
     debug("Number of tracks: %d\n", opts.num_tracks);
-    for (int i=0; i<opts.num_tracks; i++)
+    for (unsigned int i=0; i<opts.num_tracks; i++)
     {
         const track_t * const track = &opts.tracks[i];
         char buff1[N], buff2[N];

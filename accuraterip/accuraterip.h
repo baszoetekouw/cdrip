@@ -102,7 +102,7 @@ int accuraterip_checksum(
 
 /* calculate version 1 and version 2 checksum of a subrange in a larger set of PCM_s16le data */
 static inline
-int __unused accuraterip_checksum_sub(
+int UNUSED accuraterip_checksum_sub(
 	uint32_t * const checksum_v1,
 	uint32_t * const checksum_v2,
 	const int16_t * const audio_data,

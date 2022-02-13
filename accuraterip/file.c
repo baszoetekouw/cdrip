@@ -123,7 +123,7 @@ sndbuff_t fill_sndbuf_offset(const soundfile_t soundfile,
 
     if (num_read != read_len * sf_info->channels)
     {
-        fprintf(stderr, "Could read only %li of %"PRId64" samples (%lli available)\n",
+        fprintf(stderr, "Could read only %li of %"PRId64" samples (%"PRId64" available)\n",
                 num_read, read_len, sf_info->frames);
         exit(1);
     }
