@@ -24,8 +24,8 @@ from pprint import pprint
 from . import cdplayer
 
 
-class metadata:
-    def __init__(self,device):
+class Metadata:
+    def __init__(self, device):
         self._useragent = "VoidRippert", "0.1", "bas@zoetekouw.net"
         self._cdplayer = cdplayer.CDPlayer(device)
         self._disc = self._fetch_disc_info()
@@ -33,23 +33,24 @@ class metadata:
         self._info = self._parse_release_info()
 
     def _fetch_disc_info(self):
-        disc = discid.read(self._cdplayer.device_name(), ['read', 'msn', 'isrc'])
+        disc = discid.read(self._cdplayer.device_name, ['read', 'msn', 'isrc'])
         print("id: %s" % disc.id)
         print("mcn: %s" % disc.mcn)
         print("submission url:\n%s" % disc.submission_url)
         for track in disc.tracks:
-            print("{:>2}: {:>4} {:13}".format(track.number,track.seconds,track.isrc))
+            print("{:>2}: {:>4} {:13}".format(track.number, track.seconds, track.isrc))
         return disc
 
-    def _fetch_musicbrainz(self,disc_id,disc_toc):
+    def _fetch_musicbrainz(self, disc_id, disc_toc):
         mb.set_useragent(self._useragent)
 
         try:
             # note: adding a toc here will add fuzzy matching, which will return
             # _many_ results
             result = mb.get_releases_by_discid(id=self._disc.id,
-                                               includes=["artists","recordings"],
-                                               toc=self._disc.toc_string)
+                                               includes=["artists", "recordings"],
+                                               toc=self._disc.toc_string
+                                               )
         except mb.ResponseError as e:
             print("disc not found or bad response")
             pprint(vars(e))
@@ -69,7 +70,7 @@ class metadata:
             for release in result["disc"]["release-list"]:
                 #print(json.dumps(release,indent=4))
                 if 'packaging' not in release:
-                    release['packaging']='UNKNOWN'
+                    release['packaging'] = 'UNKNOWN'
                 print("  {id}: {artist-credit-phrase} / {title} / {medium-count} / {packaging}".format(**release))
             return result['disc']
         elif result.get("cdstub"):
@@ -80,7 +81,7 @@ class metadata:
         # never reached
         raise Exception('Never reached')
 
-    def _parse_release_info(self,mb_disc):
+    def _parse_release_info(self, mb_disc):
         disc_id = disc['id']
 
         info = dict()
@@ -114,16 +115,13 @@ class metadata:
 
         return info
 
-
-    def print_disc_info(self,info):
+    def print_disc_info(self, info):
         print("----")
         print("  Artist: %s" % info['artist'])
         print("  Title:  %s" % info['title'])
         print("  Date:   %s" % info['date'])
-        print("  Disc:   %u/%u" % (info['disc-num'],info['disc-tot']))
+        print("  Disc:   %u/%u" % (info['disc-num'], info['disc-tot']))
         print("  Tracks:")
         for track in info['tracks']:
             print("    %(num)02u/%(pos)02u - %(title)s" % track)
         print("----")
-
-

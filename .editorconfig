@@ -1,8 +1,8 @@
 root = true
 
 [*]
-indent_style = tab
-indent_size = tab
+indent_style = space
+indent_size = 4
 tab_width = 4
 end_of_line = lf
 charset = utf-8
@@ -12,7 +12,5 @@ max_line_length = 120
 
 [*.{yml,yaml}]
 max_line_length = 100
-indent_style = space
-indent_size = 4
 
 
