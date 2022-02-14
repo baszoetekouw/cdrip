@@ -23,6 +23,11 @@ from . import tools
 from pathlib import Path, PosixPath
 
 
+# notes:
+# see https://github.com/gchudov/cuetools.net/blob/ddec34a1ff613fe63522e9a0a48f84f3e3356395/CUETools.AccurateRip/AccurateRip.cs#L812
+# on how to query accuraterip
+
+
 class AccurateRipException(Exception):
 	pass
 

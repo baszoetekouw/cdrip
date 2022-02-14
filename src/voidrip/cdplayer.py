@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 import fcntl
@@ -15,6 +17,7 @@ from .cd import Track
 # todo: replace low-level ioctls by udev calls or cdio
 import cdio
 #import pycdio
+
 
 class CDPlayerException(Exception):
 	pass
@@ -48,11 +51,11 @@ class CDPlayer:
 	}
 
 	STATUS = {
-		'CDS_NO_INFO'         : 0,
-		'CDS_NO_DISC'         : 1,
-		'CDS_TRAY_OPEN'       : 2,
-		'CDS_DRIVE_NOT_READY' : 3,
-		'CDS_DISC_OK'         : 4
+		'CDS_NO_INFO'        : 0,
+		'CDS_NO_DISC'        : 1,
+		'CDS_TRAY_OPEN'      : 2,
+		'CDS_DRIVE_NOT_READY': 3,
+		'CDS_DISC_OK'        : 4
 	}
 
 	# list read offset _corrections_ (in samples==4 bytes)
@@ -60,17 +63,15 @@ class CDPlayer:
 	# see http://www.accuraterip.com/driveoffsets.htm for the list
 	# see https://hydrogenaud.io/index.php/topic,47862.msg425948.html#msg425948 for explanation
 	OFFSETS = {
-		('PIONEER', 'DVD-RW  DVR-110D'):  48,
-		('Optiarc', 'DVD RW AD-5260S' ):  48,
-		('ATAPI',   'DVD A DH16A6S'   ):   6,
-		('hp',      'DVD_A_DH16AESH'  ):   6,
-		('hp',      'DVD-RAM GH40L'   ): 667,
-		('HL-DT-ST','DVDRAM GH24NSD1' ):   6
+		('PIONEER',  'DVD-RW  DVR-110D'):  48,
+		('Optiarc',  'DVD RW AD-5260S' ):  48,
+		('ATAPI',    'DVD A DH16A6S'   ):   6,
+		('hp',       'DVD_A_DH16AESH'  ):   6,
+		('hp',       'DVD-RAM GH40L'   ): 667,
+		('HL-DT-ST', 'DVDRAM GH24NSD1' ):   6
 	}
 
-
-
-	def __init__(self, device: PathLike='/dev/cdrom') -> None:
+	def __init__(self, device: PathLike = '/dev/cdrom') -> None:
 		self._dev_path: Path = Path(device).resolve()
 		self._udev_context: pyudev.Context = pyudev.Context()
 		self._udev_device: pyudev.Device = pyudev.Devices.from_device_file(self._udev_context, str(self._dev_path))
@@ -81,26 +82,29 @@ class CDPlayer:
 		# sanity checks
 		try:
 			self.status()
-		except OSError: # open failed
-			if not self.device.resolve().is_block_device():
-				raise CDPlayerException(f"Device `{self.device}' is not a block device")
+		except OSError:  # open failed
+			if not self.device_name.resolve().is_block_device():
+				raise CDPlayerException(f"Device `{self.device_name}' is not a block device")
 			else:
-				raise CDPlayerException(f"Can't open device `{self.device}'")
+				raise CDPlayerException(f"Can't open device `{self.device_name}'")
 
-	def metadata(self) -> Dict:
+	def metadata(self) -> Dict[str, str]:
 		return {
-			"device": self.device.name,
+			"device": self.device_name.name,
 			"model": self.get_model(),
 			"offset": self.offset
 		}
 
+	def as_dict(self) -> Dict:
+		return self.metadata()
+
 	@property
-	def device(self) -> Path:
+	def device_name(self) -> Path:
 		return self._dev_path
 
 	@property
-	def devicename(self) -> str:
-		return os.fspath(self.device)
+	def device(self) -> cdio.Device:
+		return self._device
 
 	@property
 	def offset(self) -> int:
@@ -108,14 +112,14 @@ class CDPlayer:
 		#print(f'Found vendor="{vendor}", model="{model}"')
 		if vendor is None:
 			return 0
-		if (vendor,model) in self.OFFSETS:
+		if (vendor, model) in self.OFFSETS:
 			#print(f'Found offset={self.OFFSETS[(vendor,model)]}')
-			return self.OFFSETS[(vendor,model)]
+			return self.OFFSETS[(vendor, model)]
 		else:
 			raise CDPlayerException("Unknown drive; unable to get drive offset")
 
 	def open(self) -> int:
-		fd = os.open(self.devicename, os.O_RDONLY | os.O_NONBLOCK)
+		fd = os.open(self.device_name, os.O_RDONLY | os.O_NONBLOCK)
 		return fd
 
 	def ioctl(self, ioctl_id: int, param: int) -> int:
@@ -128,7 +132,7 @@ class CDPlayer:
 		return self.ioctl(CDPlayer.IOCTL['CDROM_DRIVE_STATUS'], 0)
 
 	def is_open(self) -> bool:
-		return self.status()==CDPlayer.STATUS['CDS_TRAY_OPEN']
+		return self.status() == CDPlayer.STATUS['CDS_TRAY_OPEN']
 
 	def has_disc(self) -> bool:
 		if self._udev_device.properties.get('ID_CDROM_MEDIA_CD'):
@@ -156,7 +160,7 @@ class CDPlayer:
 			if self._dev_path == Path(dev.device_node) \
 			   and dev.properties.get('DISK_MEDIA_CHANGE') \
 			   and dev.properties.get('ID_CDROM_MEDIA_CD'):
-					return
+				return
 
 	def tray_open(self) -> None:
 		self.ioctl(CDPlayer.IOCTL['CDROM_LOCKDOOR'], 0)
@@ -165,15 +169,15 @@ class CDPlayer:
 	def tray_close(self) -> None:
 		self.ioctl(CDPlayer.IOCTL['CDROM_LOCKDOOR'], 0)
 		self.ioctl(CDPlayer.IOCTL['CDROM_CLOSETRAY'], 0)
-		for i in range(0,195):
+		for i in range(0, 195):
 			if not self.is_open():
 				break
 			time.sleep(1)
 		else:
 			raise CDPlayerException('Could not close tray')
 
-	def get_model(self) -> Optional[Tuple[str,str]]:
-		fullpath = os.path.realpath(self.device)
+	def get_model(self) -> Optional[Tuple[str, str]]:
+		fullpath = os.path.realpath(self.device_name)
 		devname = os.path.basename(fullpath)
 		syspath = os.path.join('/sys/block', devname, 'device')
 		try:
@@ -185,18 +189,18 @@ class CDPlayer:
 			raise CDPlayerException(f"Can't open CDplayer sys info in '{syspath}'")
 		return vendor, model
 
-	def get_drive_info(self) -> Dict[str,str]:
+	def get_drive_info(self) -> Dict[str, str]:
 		model, vendor = self.get_model()
-		return dict(
-			model = model,
-			vendor = vendor,
-			offset = self.offset,
-		)
+		return {
+			"model"  : model,
+			"vendor" : vendor,
+			"offset" : self.offset,
+		}
 
 	@property
 	def firsttrack(self):
 		track_first = self._device.get_first_track().track
-		if track_first!=1:
+		if track_first != 1:
 			raise CDPlayerException(f"First track is not 1 but `{track_first}'")
 		return track_first
 
@@ -213,15 +217,15 @@ class CDPlayer:
 		for t in self.tracks:
 			try:
 				track = self._device.get_track(t)
-			except:
+			except Exception:
 				raise CDPlayerException(f"Failed to fetch track {t}")
 			tracks.append(Track(track))
 		return tracks
 
 	@property
-	def info(self) -> Dict[str,Any]:
+	def info(self) -> Dict[str, Any]:
 		if self._cdinfo is None:
-			yml = tools.execcmd(Path(tools.script_dir().parent,"cd-info","cd-info"), [str(self._dev_path)]).stdout
+			yml = tools.execcmd(Path(tools.script_dir().parent, "cd-info", "cd-info"), [str(self._dev_path)]).stdout
 			self._cdinfo = yaml.safe_load(yml)
 		return self._cdinfo
 
@@ -233,10 +237,7 @@ class CDPlayer:
 		track = self._device.get_track(track_num)
 		return Track(track)
 
-
 	def get_disc(self) -> cd.Disc:
-		disc = cd.Disc(self._device)
+		disc = cd.Disc(self)
 		return disc
-
-
 

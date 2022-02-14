@@ -20,7 +20,7 @@ class VoidRip:
 		self._cdplayer : cdplayer = cdplayer.CDPlayer(device)
 		self._tmpdir : os.PathLike = tmpdir
 		if tmpdir is None:
-			self._tempdir = tempfile.TemporaryDirectory(prefix=f'{self._name}_{self._cdplayer.device.stem}')
+			self._tempdir = tempfile.TemporaryDirectory(prefix=f'{self._name}_{self._cdplayer.device_name.stem}')
 		self._audiorip : audiorip = audiorip.AudioRip(cd=self._cdplayer, destdir=self._tempdir.name)
 		self._disc : Optional[cd.Disc] = None
 

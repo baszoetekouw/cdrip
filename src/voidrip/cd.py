@@ -1,14 +1,22 @@
+from __future__ import annotations
+
 import collections
 import enum
 import json
 from enum import Enum
-from typing import List, Optional, Generator, Dict, Union, Final
+from typing import Tuple, List, Optional, Generator, Dict, Union, Final
 #from pathlib import Path
+from inspect import ismethod
+from dataclasses import dataclass
+
+import typing
+if typing.TYPE_CHECKING:
+	from . import CDPlayer
 
 #import tocparser
 import pycdio
 import cdio
-#import discid
+import discid
 
 
 # lift tocparser.TOC into our own namespace
@@ -50,16 +58,30 @@ class DiscMode(enum.Enum):
 
 CDText_type = Dict[str, Union[str, Dict]]
 
+
 # types for cd timings
-MSF = collections.namedtuple('MSF', ['min', 'sec', 'frame'])
+@dataclass
+class MSF:
+	min: int
+	sec: int
+	frame: int
+
+	def as_dict(self) -> str:
+		return f"{self.min:02d}:{self.sec:02d}.{self.frame:02d}"
+
+
 LBA = int
 LSN = int
+
 
 # basic CD contants
 CDA_FRAMES_PER_SEC: Final[int] = 75
 CDA_FRAMES_PER_MIN: Final[int] = CDA_FRAMES_PER_SEC * 60
 CDA_PREGAP_FRAMES:  Final[int] = 150
 
+
+# Note: LBA (logical block access) = absolute pos on disc (track 1 starts at lba=150)
+#       LSN (logical sector number) = number fo frames since audio start (start 1 start at lsn=0)
 
 def lba2msf(lba: LSN) -> MSF:
 	m = lba // CDA_FRAMES_PER_MIN
@@ -92,6 +114,10 @@ class DiscException(Exception):
 
 
 class CDJSONEncoder(json.JSONEncoder):
+	@staticmethod
+	def has_method(instance, method):
+		return hasattr(instance, method) and ismethod(getattr(instance, method))
+
 	def default(self, obj):
 		if isinstance(obj, bytes):
 			try:
@@ -106,6 +132,8 @@ class CDJSONEncoder(json.JSONEncoder):
 						return ''.join(
 							[bytes(b).decode('ASCII') if 32 <= b <= 126 else "?" for b in obj]
 						)
+		elif self.has_method(obj, "as_dict"):
+			return obj.as_dict()
 		elif isinstance(obj, Track):
 			return obj.__dict__
 		elif isinstance(obj, Enum):
@@ -128,6 +156,11 @@ class Track:
 	def __init__(self, track: cdio.Track):
 		self.num: int = track.track
 		self.first_lba: LBA = track.get_lba()
+		# TODO: this breaks for CDs with non-audio tracks
+		#       get_last_lsn() is inplemented by looking at the start of the next track, but if that is a
+		#       data track, there is an 11250 leadin/out and 150 frames pregap inbetween the tracks
+		#       see example here  https://musicbrainz.org/doc/Disc%20ID%20Calculation
+		#       libcdio implementation: http://git.savannah.gnu.org/cgit/libcdio.git/tree/lib/driver/track.c line 354
 		self.last_lba: LBA = lsn2lba(track.get_last_lsn())
 		self.channels: int = track.get_audio_channels()
 		self.format: TrackFormat = TrackFormat(track.get_format())
@@ -139,12 +172,22 @@ class Track:
 		self.is_green: bool = track.is_green()
 		self.isrc: str = track.get_isrc()
 
-	def __repr__(self):
+		self.verify()
+
+	def verify(self) -> None:
+		# if non-audio tracks are present, calculation of track lengths is broken (see above)
+		if self.format != TrackFormat.AUDIO:
+			raise TrackException(f"Unsupported trackformat {self.format}")
+
+	def __repr__(self) -> str:
 		s = f"<{self.__class__.__name__}\n"
 		for k, v in {**vars(self), **dict(length=self.length)}.items():
 			s += f"  {k}: {v}\n"
 		s += ">"
 		return s
+
+	def as_dict(self) -> Dict:
+		return self.__dict__ | {"length": lba2msf(self.length)}
 
 	@property
 	def length(self) -> int:
@@ -156,7 +199,9 @@ class Track:
 
 
 class Disc:
-	def __init__(self, device: cdio.Device):
+	def __init__(self, cdplayer: Optional[CDPlayer]):
+		self.cdplayer = cdplayer
+		device = cdplayer.device
 		self.first_track: int = pycdio.get_first_track_num(device.cd)
 		self.num_tracks: int = pycdio.get_last_track_num(device.cd)
 		self.last_track: int = self.first_track + self.num_tracks - 1
@@ -182,7 +227,12 @@ class Disc:
 		return s
 
 	def as_json(self) -> str:
-		return json.dumps(self.__dict__, indent=4, cls=CDJSONEncoder)
+		extra = {
+			"id_cddb": self.id_cddb(),
+			"id_musicbrainz": self.id_musicbrainz(),
+			"id_accuraterip": self.id_accuraterip()
+		}
+		return json.dumps(self.__dict__ | extra, indent=4, cls=CDJSONEncoder)
 
 	def verify(self) -> None:
 		if self.first_track != 1:
@@ -237,11 +287,38 @@ class Disc:
 			yield t
 			t = t + 1
 
+	def tracks_lba(self) -> List[LBA]:
+		return [t.first_lba for t in self.tracks]
+
+	def tracks_lsn(self) -> List[LSN]:
+		return [lba2lsn(t.first_lba) for t in self.tracks]
+
+	# total number of audio frames on this disc (usually the start of the eladout track
+	def num_frames(self) -> int:
+		return self.tracks[-1].last_lba+1
+
 	def id_cddb(self) -> str:
-		return ""
+		disc = discid.put(self.first_track, self.last_track, self.num_frames(), self.tracks_lba())
+		return disc.freedb_id
 
 	def id_musicbrainz(self) -> str:
-		return ""
+		disc = discid.put(self.first_track, self.last_track, self.num_frames(), self.tracks_lba())
+		return disc.id
+
+	def id_accuraterip(self) -> Tuple[str, str, str]:
+		# see https://github.com/gchudov/cuetools.net/blob/master/CUETools.AccurateRip/AccurateRip.cs#L1297
+		# better use this: https://github.com/tuffy/python-audio-tools/blob/master/audiotools/accuraterip.py#L230
+		id1 = 0
+		id2 = 0
+
+		id1 = sum(self.tracks_lsn()) + lba2lsn(self.num_frames())
+		id2 = sum([n * max(o, 1) for (n, o) in zip(self.track_nums(), self.tracks_lsn())]) + \
+			  (self.last_track + 1) * lba2lsn(self.num_frames())
+
+		id1 &= 0xffffffff
+		id2 &= 0xffffffff
+
+		return f"{id1:08x}", f"{id2:08x}", self.id_cddb()
 
 
 

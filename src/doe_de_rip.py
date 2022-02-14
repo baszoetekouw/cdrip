@@ -27,6 +27,8 @@ def main():
 
 	disc = cdplayer.get_disc()
 	print(disc.as_json())
+	print("cddb_id: ", disc.id_cddb())
+	print("musicbrainz_id: ", disc.id_musicbrainz())
 	return
 
 

@@ -72,7 +72,7 @@ class AudioRip:
 			'read-cd',
 			'--datafile', 'cdrdao.raw',
 			'--paranoia-mode=2',
-			'--device', self.cd.devicename,
+			'--device', self.cd.device_name,
 			'cdrdao.toc'],
 			cwd=self.cwd
 		)
@@ -82,7 +82,7 @@ class AudioRip:
 		# cdparanoia
 		outputfile = Path(f'cdparanoia_{track:02d}.wav')
 		self.exec('cdparanoia', [
-			'--output-wav', '--force-cdrom-device', self.cd.devicename,
+			'--output-wav', '--force-cdrom-device', self.cd.device_name,
 			'--sample-offset', f'{self.cd.offset:d}', f'{track:d}',
 			outputfile
 		])
