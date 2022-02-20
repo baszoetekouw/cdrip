@@ -19,28 +19,34 @@
 
 #import tocparser
 from os import PathLike
+import os.path
 from typing import Union, Optional, List
 from pathlib import Path
 
+from . import cd
 from . import cdplayer
+from .accuraterip import AccurateRip
 from . import tools
 
 
 # this class handles the actual ripping from cd to audio file
 # all intermediate files are stored as raw 16-bit signed samples (at 44.1kHz)
 
-class AudioRip:
+class AudioRipper:
     COMMANDS = {
         'cdrdao': Path('/usr/bin/cdrdao'),
         'cdparanoia': Path('/usr/bin/cdparano1ia'),
         'sox': Path('/usr/bin/sox'),
     }
-    sox_raw_spec = ['-t', 'raw', '--endian', 'big',    '-b16', '-esigned', '-c2', '-r44100']
+    sox_raw_spec = ['-t', 'raw', '--endian', 'little', '-b16', '-esigned', '-c2', '-r44100']
     sox_wav_spec = ['-t', 'wav', '--endian', 'little', '-b16', '-esigned', '-c2', '-r44100']
 
-    def __init__(self, cd : cdplayer.CDPlayer, destdir: PathLike) -> None:
-        self._cdplayer: cdplayer.CDPlayer = cd
+    def __init__(self, disc : cd.Disc, destdir: PathLike) -> None:
+        self._disc: cd.Disc = disc
+        self._cdplayer: cdplayer.CDPlayer = disc.cdplayer
         self._destdir: Path = Path(destdir)
+        self._audio_file: Optional[Path] = None
+        self._cue_file: Optional[Path] = None
 
     @property
     def cd(self) -> cdplayer.CDPlayer:
@@ -57,26 +63,44 @@ class AudioRip:
     def path(self, name: Union[PathLike, str]) -> Path:
         return Path(self._destdir, name)
 
-    def rip(self, output) -> None:
+    def rip(self) -> None:
         # https://github.com/thomasvs/morituri/blob/master/examples/readdisc.py./con
-        pass
+        raw_file = self.rip_fast_fullcd()
+        wav_file = self.convert_to_wav()
+        accuraterip = AccurateRip(self._disc, wav_file)
+        chksums = accuraterip.checksum_disc()
+        return
 
     def exec(self, command: str, args: List[str], cwd: Optional[PathLike] = None):
         if cwd is None:
             cwd = self.cwd
-        tools.execcmd(self.COMMANDS[command], args, cwd)
+        cmd = self.COMMANDS[command]
+        process = tools.execcmd(cmd=cmd, args=args, cwd=cwd)
+        if process.returncode != 0:
+            print(f"Woops, command '{cmd}' failed:")
+            print(process.stderr)
+            process.check_returncode()
+        print(process.stdout)
+        print(process.stderr)
 
-    def rip_fast_fullcd(self) -> None:
-        # cdrdao
-        tools.execcmd(self.COMMANDS['cdrdao'], [
-            'read-cd',
-            '--datafile', 'cdrdao.raw',
-            '--paranoia-mode=2',
-            '--device', self.cd.device_name,
-            'cdrdao.toc'],
-            cwd=self.cwd
-        )
+    def rip_fast_fullcd(self) -> PathLike:
+        rawfile = self.path('cdrdao.raw')
+        self._cue_file = self.path('cdrdao.toc')
+
+        if os.path.exists(rawfile):
+            print("Rip exists, skipping")
+        else:
+            # cdrdao
+            self.exec('cdrdao', [
+                'read-cd',
+                '--datafile', 'cdrdao.raw',
+                '--paranoia-mode', '1',
+                '--device', self.cd.device_name,
+                'cdrdao.toc']
+            )
+
         #self._disc = Disc(self.path('cdrdao.toc'), self.path('cdrdao.raw'))
+        return self.path('cdrdao.raw')
 
     def rip_accurate_track(self, track: int) -> PathLike:
         # cdparanoia
@@ -87,6 +111,18 @@ class AudioRip:
             outputfile
         ])
         return outputfile
+
+    def convert_to_wav(self) -> PathLike:
+        filename = 'cdrdao.wav'
+        if os.path.exists(self.path(filename)):
+            print("Wav exists, skipping")
+        else:
+            self.exec('sox',
+                      self.sox_raw_spec + ['cdrdao.raw'] +
+                      self.sox_wav_spec + [filename]
+                      )
+        self._audio_file = self.path(filename)
+        return self._audio_file
 
     def correct_offset(self):
         # examples:

@@ -17,6 +17,8 @@ def main():
     #cdplayer.tray_open()
     #time.sleep(1.0)
 
+    tmpdir = Path("/data/cdrip/test/")
+
     print("Waiting for cd...")
     cdplayer.wait_for_disc()
 
@@ -27,8 +29,11 @@ def main():
 
     disc = cdplayer.get_disc()
     print(disc.as_json())
-    print("cddb_id: ", disc.id_cddb())
-    print("musicbrainz_id: ", disc.id_musicbrainz())
+    print(" ".join([f"{t.first_sample}s,{t.length_samples}s" for t in disc.tracks]))
+
+    rip = voidrip.AudioRipper(disc, tmpdir)
+    rip.rip()
+
     return
 
     #for devicename in ('/dev/cdrom0','/dev/cdrom1','/dev/cdrom2','/dev/cdrom3'):

@@ -10,7 +10,7 @@ from typing import Optional
 from pprint import pprint
 from . import cdplayer
 from . import cd
-from . import audiorip
+from . import audioripper
 
 
 class CDException(Exception):
@@ -24,7 +24,7 @@ class VoidRip:
         self._tmpdir : os.PathLike = tmpdir
         if tmpdir is None:
             self._tempdir = tempfile.TemporaryDirectory(prefix=f'{self._name}_{self._cdplayer.device_name.stem}')
-        self._audiorip : audiorip = audiorip.AudioRip(cd=self._cdplayer, destdir=self._tempdir.name)
+        self._audiorip : audiorip = audiorip.AudioRipper(cd=self._cdplayer, destdir=self._tempdir.name)
         self._disc : Optional[cd.Disc] = None
 
     def get_path(self, filename : str) -> str:

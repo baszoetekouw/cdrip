@@ -16,9 +16,9 @@ def execcmd(cmd: Union[Path, PathLike],
         tmp = thedir.name
 
     # TODO: check if cmd is executable1
-    cmdline = [str(cmd)] + list(args)
-    print(f'Running: "{cmdline}"')
-    return subprocess.run(cmdline, cwd=tmp, capture_output=True)
+    cmdline = [str(cmd)] + [str(a) for a in args]
+    print(f'Running: "{" ".join(cmdline)}"')
+    return subprocess.run(cmdline, cwd=tmp, capture_output=True, encoding='utf-8')
 
 
 def script_dir() -> Path:

@@ -75,9 +75,11 @@ LSN = int
 
 
 # basic CD contants
-CDA_FRAMES_PER_SEC: Final[int] = 75
-CDA_FRAMES_PER_MIN: Final[int] = CDA_FRAMES_PER_SEC * 60
-CDA_PREGAP_FRAMES:  Final[int] = 150
+CDA_SAMLES_PER_SEC:    Final[int] = 44100
+CDA_FRAMES_PER_SEC:    Final[int] = 75
+CDA_FRAMES_PER_MIN:    Final[int] = CDA_FRAMES_PER_SEC * 60
+CDA_SAMPLES_PER_FRAME: Final[int] = CDA_SAMLES_PER_SEC // CDA_FRAMES_PER_SEC
+CDA_PREGAP_FRAMES:     Final[int] = 150
 
 
 # Note: LBA (logical block access) = absolute pos on disc (track 1 starts at lba=150)
@@ -103,6 +105,14 @@ def lba2lsn(lba: LBA) -> LSN:
 
 def lsn2lba(lsn: LSN) -> LBA:
     return lsn + CDA_PREGAP_FRAMES
+
+
+def lsn2sample(lsn: LSN) -> int:
+    return lsn * CDA_SAMPLES_PER_FRAME
+
+
+def lba2sample(lsn: LSN) -> int:
+    return lba2lsn(lsn) * CDA_SAMPLES_PER_FRAME
 
 
 class TrackException(Exception):
@@ -187,7 +197,12 @@ class Track:
         return s
 
     def as_dict(self) -> Dict:
-        return self.__dict__ | {"length": lba2msf(self.length)}
+        extra = {
+            "length": lba2msf(self.length),
+            "first_sample": lba2sample(self.first_lba),
+            "length_sample": lsn2sample(self.length),
+        }
+        return self.__dict__ | extra
 
     @property
     def length(self) -> int:
@@ -196,6 +211,14 @@ class Track:
     @property
     def start_msf(self) -> MSF:
         return lba2msf(self.first_lba)
+
+    @property
+    def first_sample(self) -> int:
+        return lba2sample(self.first_lba)
+
+    @property
+    def length_samples(self) -> int:
+        return lsn2sample(self.length)
 
 
 class Disc:
