@@ -17,6 +17,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+from __future__ import annotations
+
 #import tocparser
 from os import PathLike
 import os.path
@@ -69,6 +71,7 @@ class AudioRipper:
         wav_file = self.convert_to_wav()
         accuraterip = AccurateRip(self._disc, wav_file)
         chksums = accuraterip.checksum_disc()
+        bla = accuraterip.lookup()
         return
 
     def exec(self, command: str, args: List[str], cwd: Optional[PathLike] = None):

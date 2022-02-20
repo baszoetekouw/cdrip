@@ -4,10 +4,11 @@ from __future__ import annotations
 import enum
 import json
 from enum import Enum
-from typing import Tuple, List, Optional, Generator, Dict, Union, Final
+from typing import List, Optional, Generator, Dict, Union, Final
 #from pathlib import Path
 from inspect import ismethod
 from dataclasses import dataclass
+from .accuraterip import AccurateRipID
 
 import typing
 if typing.TYPE_CHECKING:
@@ -328,7 +329,7 @@ class Disc:
         disc = discid.put(self.first_track, self.last_track, self.num_frames(), self.tracks_lba())
         return disc.id
 
-    def id_accuraterip(self) -> Tuple[str, str, str]:
+    def id_accuraterip(self) -> AccurateRipID:
         # see https://github.com/gchudov/cuetools.net/blob/master/CUETools.AccurateRip/AccurateRip.cs#L1297
         # better use this: https://github.com/tuffy/python-audio-tools/blob/master/audiotools/accuraterip.py#L230
 
@@ -338,5 +339,6 @@ class Disc:
 
         id1 &= 0xffffffff
         id2 &= 0xffffffff
+        id3 = int(self.id_cddb(), 16)
 
-        return f"{id1:08x}", f"{id2:08x}", self.id_cddb()
+        return AccurateRipID(self.num_tracks, id1, id2, id3)
