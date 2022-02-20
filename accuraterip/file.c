@@ -53,7 +53,7 @@ sndbuff_t fill_sndbuf(const soundfile_t soundfile,
 
 
 /* read samples from file and put them in a newly allocated buffer
- * of offset is non-zero, shift all samples backward in the buffer
+ * if offset is non-zero, shift all samples backward in the buffer
  * by either inserting 0s at the start of the buffer, or by skipping the
  * correct amount of sample at start or end
  */
@@ -75,6 +75,10 @@ sndbuff_t fill_sndbuf_offset(const soundfile_t soundfile,
 
     size_t buf_size = sndbuf.num_samples * BYTES_PER_SAMPLE;
     sndbuf.samples  = malloc(buf_size);
+    if (sndbuf.samples==NULL) {
+        fprintf(stderr, "Failed to allocate %zu bytes\n", buf_size);
+        exit(1);
+    }
 
     /* just to make sure the buffer really get filled correctly and to make debugging easier*/
     memset(sndbuf.samples, 0xff, buf_size);

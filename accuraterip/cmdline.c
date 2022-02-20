@@ -147,6 +147,14 @@ opts_t parse_args(const int argc, char ** argv) {
     for (unsigned int i=0; i<opts.num_tracks; i++)
     {
         const track_t * const track = &opts.tracks[i];
+
+        /* check if track pos/len makes sense */
+
+        if (track->sample_start>MAX_SAMPLES || track->sample_length>MAX_SAMPLES)
+        {
+            help("Track %u start and/or length is too large (maybe you mixed up samples and seconds?)", i+1);
+        }
+
         char buff1[N], buff2[N];
         debug("  - track %d: start %s (%"PRId64"), len %s (%"PRId64") (%c/%c)\n", i,
                 samplestostr(buff1, N, track->sample_start ), track->sample_start,
