@@ -71,7 +71,10 @@ class AudioRipper:
         wav_file = self.convert_to_wav()
         accuraterip = AccurateRip(self._disc, wav_file)
         chksums = accuraterip.checksum_disc()
-        bla = accuraterip.lookup()
+        ar_results = accuraterip.lookup()
+        for t in self._disc.track_nums():
+            confidence = ar_results.find(t, chksums[t])
+            print(f"track {t:02d}: disk {chksums[t]}, confidence {confidence}")
         return
 
     def exec(self, command: str, args: List[str], cwd: Optional[PathLike] = None):

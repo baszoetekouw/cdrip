@@ -77,6 +77,36 @@ class AccurateRipResults:
     def __post_init__(self):
         self.track = {i: {} for i in range(1, self.id.num_tracks+1)}
 
+    @classmethod
+    def parse_accuraterip_bin(cls, bin_data: bytes, orig_id: AccurateRipID) -> AccurateRipResults:
+        #print(repr(bin_data))
+
+        results = cls(id=orig_id)
+
+        pos = 0
+        while pos < len(bin_data):
+            accuraterip_id = AccurateRipID(*struct.unpack("<BIII", bin_data[pos:pos + 13]))
+            if accuraterip_id != orig_id:
+                raise AccurateRipException(f"Mismatch in returned accurateripid: {accuraterip_id}!={orig_id}")
+
+            # print(accuraterip_id)
+            it = struct.iter_unpack("<BII", bin_data[pos + 13:pos + 13 + 9 * accuraterip_id.num_tracks])
+            for i, track in enumerate(it):
+                # print(f" --> {i+1} - {track}")
+                results.add_track(i + 1, crc1=track[1], crc2=track[2], confidence=track[0])
+            pos += 13 + 9 * accuraterip_id.num_tracks
+
+        return results
+
+    def __repr__(self) -> str:
+        ret = ""
+        ret += f"{type(self).__name__}(id={self.id},"
+        for t, values in self.track.items():
+            ret += f"\n    track {t:02d}: "
+            ret += "\n              ".join([f"{k}: {v}" for k, v in values.items()])
+        ret += ")"
+        return ret
+
     # get_item and set_item are 1-based
     def __getitem__(self, track: int) -> Dict[AccurateRipTrackID, AccurateRipConfidence]:
         if track < 1 or track > self.id.num_tracks:
@@ -84,7 +114,7 @@ class AccurateRipResults:
         return self.track[track]
 
     # get_item and set_item are 1-based
-    def __setitem__(self, track, value) -> None:
+    def __setitem__(self, track, value: Dict[AccurateRipTrackID, AccurateRipConfidence]) -> None:
         if track < 1 or track > self.id.num_tracks:
             raise AccurateRipException(f"Invalid track number {track}")
         self.track[track] = value
@@ -104,6 +134,12 @@ class AccurateRipResults:
             return self[track][crc]
         except KeyError:
             return None
+
+    def find(self, track: int, track_id: AccurateRipTrackID) -> AccurateRipConfidence:
+        try:
+            return self[track][track_id]
+        except KeyError:
+            return 0
 
 
 @dataclass(frozen=True)
@@ -166,7 +202,7 @@ class AccurateRip:
     # get checksums for multiple tracks in a single file
     # todo: make a proper object to describe the tracks
     def checksum_multi(self, filename: PathLike,
-                       tracks: List[Tuple[int, int]], offset: int = 0) -> List[AccurateRipTrackID]:
+                       tracks: List[Tuple[int, int]], offset: int = 0) -> Dict[int, AccurateRipTrackID]:
         if not Path(filename).exists():
             raise FileNotFoundError(f"Audio file '{filename}' not found")
 
@@ -175,43 +211,24 @@ class AccurateRip:
         args += ["{}s,{}s".format(*t) for t in tracks]
 
         chksums = self._run_binary(args)
-        return chksums
+
+        # return a 1-based list (real track numbers)
+        return {k+1: v for k, v in enumerate(chksums)}
 
     def checksum_disc(self) -> List[AccurateRipTrackID]:
         track_spec = [(t.first_sample, t.length_samples) for t in self._disc.tracks]
         chksums = self.checksum_multi(self._wav, track_spec, self.offset)
-        print(chksums)
-        return [AccurateRipTrackID(0, 0)]
+        return chksums
 
-    @staticmethod
-    def _parse_accuraterip(bin_data: bytes, orig_id: AccurateRipID) -> AccurateRipResults:
-        print(repr(bin_data))
-
-        results = AccurateRipResults(id=orig_id)
-
-        pos = 0
-        while pos < len(bin_data):
-            accuraterip_id = AccurateRipID(*struct.unpack("<BIII", bin_data[pos:pos+13]))
-            if accuraterip_id != orig_id:
-                raise AccurateRipException(f"Mismatch in returned accurateripid: {accuraterip_id}!={orig_id}")
-
-            #print(accuraterip_id)
-            it = struct.iter_unpack("<BII", bin_data[pos+13:pos+13+9*accuraterip_id.num_tracks])
-            for i, track in enumerate(it):
-                #print(f" --> {i+1} - {track}")
-                results.add_track(i+1, crc1=track[1], crc2=track[2], confidence=track[0])
-            pos += 13 + 9 * accuraterip_id.num_tracks
-
-        return results
-
-    def lookup(self) -> Optional[List[AccurateRipTrackID]]:
+    def lookup(self) -> Optional[AccurateRipResults]:
         accuraterip_id = self._disc.id_accuraterip()
 
         print(f"Fetching {accuraterip_id.url}")
         response = urllib.request.urlopen(accuraterip_id.url)
         if response.status != 200:
+            # TODO: sometimes this might e ok, and we jsut return None
             raise AccurateRipException(f"Couldn't fetch accuraterip entry: {response.reason}")
-        ar_known = self._parse_accuraterip(response.read(), accuraterip_id)
+        ar_known = AccurateRipResults.parse_accuraterip_bin(response.read(), accuraterip_id)
         print(ar_known)
 
-        return None
+        return ar_known

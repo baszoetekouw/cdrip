@@ -22,7 +22,7 @@ int accuraterip_checksum(
 		return -1;
 	}
 
-	/* skip first 5 seconds in first track and last 5 seconds in final track */
+	/* skip first 5 frames in first track and last 5 frames in final track */
 	const uint16_t *audio_start = (const uint16_t *) audio_data;
 	const uint16_t *audio_end   = audio_start + num_samples*num_channels;
 	uint32_t crc_pos = 1;
