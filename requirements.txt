@@ -7,3 +7,4 @@ pyudev==0.23.2
 git+https://github.com/tuffy/python-audio-tools.git@master#egg=audiotools
 git+https://github.com/rocky/pycdio@master#egg=pycdio
 #git+https://github.com/cmlburnett/tocparser
+pytz>=2021.3

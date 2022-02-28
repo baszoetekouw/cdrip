@@ -3,14 +3,15 @@ from __future__ import annotations
 # import collections
 import enum
 import json
-from enum import Enum
 from typing import List, Optional, Generator, Dict, Union, Final
 #from pathlib import Path
-from inspect import ismethod
 from dataclasses import dataclass
 from .accuraterip import AccurateRipID
 
 import typing
+
+from .tools import AudioRipperJSONEncoder
+
 if typing.TYPE_CHECKING:
     from . import CDPlayer
 
@@ -127,35 +128,6 @@ class DiscException(Exception):
     pass
 
 
-class CDJSONEncoder(json.JSONEncoder):
-    @staticmethod
-    def has_method(instance, method):
-        return hasattr(instance, method) and ismethod(getattr(instance, method))
-
-    def default(self, obj):
-        if isinstance(obj, bytes):
-            try:
-                return obj.decode('utf_8')
-            except SyntaxError:
-                try:
-                    return obj.decode('iso8859_15')
-                except SyntaxError:
-                    try:
-                        return obj.decode('utf_16')
-                    except SyntaxError:
-                        return ''.join(
-                            [bytes(b).decode('ASCII') if 32 <= b <= 126 else "?" for b in obj]
-                        )
-        elif self.has_method(obj, "as_dict"):
-            return obj.as_dict()
-        elif isinstance(obj, Track):
-            return obj.__dict__
-        elif isinstance(obj, Enum):
-            return obj.name
-
-        return super(CDJSONEncoder, self).default(obj)
-
-
 class Track:
     @staticmethod
     def parse_preemphasis(preemphasis: int) -> Optional[bool]:
@@ -258,19 +230,22 @@ class Disc:
         s += f"Mode: {self.mode}\n"
         s += f"Joliet level: {self.jolietlvl}\n"
         s += f"cdtext:"
-        s += json.dumps(self.cdtext, indent=4, cls=CDJSONEncoder) + "\n"
+        s += json.dumps(self.cdtext, indent=4, cls=AudioRipperJSONEncoder) + "\n"
 
         for t in self.tracks:
             s += t.__repr__() + "\n"
         return s
 
-    def as_json(self) -> str:
+    def as_dict(self) -> Dict:
         extra = {
             "id_cddb": self.id_cddb(),
             "id_musicbrainz": self.id_musicbrainz(),
             "id_accuraterip": self.id_accuraterip()
         }
-        return json.dumps(self.__dict__ | extra, indent=4, cls=CDJSONEncoder)
+        return self.__dict__ | extra
+
+    def as_json(self) -> str:
+        return json.dumps(self.as_dict(), indent=4, cls=AudioRipperJSONEncoder)
 
     def verify(self) -> None:
         if self.first_track != 1:

@@ -9,7 +9,7 @@ from pathlib import Path
 #from os import PathLike
 #from pprint import pprint
 
-cdrom_dev = Path("/dev/cdrom0")
+cdrom_dev = Path("/dev/cdrom1")
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
     #cdplayer.tray_open()
     #time.sleep(1.0)
 
-    tmpdir = Path("/data/cdrip/test/") / cdrom_dev.name
+    tmpdir = Path("/data/cdrip/") / cdrom_dev.name
     tmpdir.mkdir(parents=True, exist_ok=True)
 
     print("Waiting for cd...")
@@ -34,6 +34,8 @@ def main():
 
     rip = voidrip.AudioRipper(disc, tmpdir)
     rip.rip()
+
+    print(rip.as_json())
 
     return
 
