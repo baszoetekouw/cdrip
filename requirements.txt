@@ -1,7 +1,9 @@
 PyYAML~=6.0
 discid~=1.2.0
 musicbrainzngs~=0.7.1
-pyudev~=0.23.0
+pyudev==0.23.2
 #pycdio~=2.1.0
+#pyaudiotools>=3.2a2
+git+https://github.com/tuffy/python-audio-tools.git@master#egg=audiotools
 git+https://github.com/rocky/pycdio@master#egg=pycdio
 #git+https://github.com/cmlburnett/tocparser

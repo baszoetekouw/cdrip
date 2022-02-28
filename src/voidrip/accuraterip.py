@@ -23,16 +23,18 @@ import urllib.request
 import struct
 from dataclasses import dataclass, field
 from os import PathLike
-from pathlib import Path, PosixPath
+from pathlib import PosixPath
 from typing import Dict, Tuple, Optional, List
 
-from . import tools
+import audiotools
+import audiotools.accuraterip
+
 from . import cd
+
 
 # notes:
 # see https://github.com/tuffy/python-audio-tools/blob/master/audiotools/accuraterip.py#L286
 # on how to query accuraterip
-
 
 class AccurateRipException(Exception):
     pass
@@ -55,7 +57,10 @@ class AccurateRipID:
         return self.id
 
     def as_dict(self) -> Dict[str, str]:
-        return self.__dict__
+        extra = {
+            "id": self.id
+        }
+        return self.__dict__ | extra
 
     @property
     def url(self):
@@ -75,11 +80,11 @@ class AccurateRipResults:
     track: Dict[int, Dict[AccurateRipTrackID, AccurateRipConfidence]] = field(init=False)
 
     def __post_init__(self):
-        self.track = {i: {} for i in range(1, self.id.num_tracks+1)}
+        self.track = {i: {} for i in range(1, self.id.num_tracks + 1)}
 
     @classmethod
     def parse_accuraterip_bin(cls, bin_data: bytes, orig_id: AccurateRipID) -> AccurateRipResults:
-        #print(repr(bin_data))
+        # print(repr(bin_data))
 
         results = cls(id=orig_id)
 
@@ -108,7 +113,7 @@ class AccurateRipResults:
         return ret
 
     # get_item and set_item are 1-based
-    def __getitem__(self, track: int) -> Dict[AccurateRipTrackID, AccurateRipConfidence]:
+    def __getitem__(self, track: cd.TrackNr) -> Dict[AccurateRipTrackID, AccurateRipConfidence]:
         if track < 1 or track > self.id.num_tracks:
             raise AccurateRipException(f"Invalid track number {track}")
         return self.track[track]
@@ -121,25 +126,24 @@ class AccurateRipResults:
         return
 
     # add_track uses cd track numbers (first track==1)
-    def add_track(self, track_no: int, crc1: AccurateRipTrackID1, crc2: AccurateRipTrackID2,
-                  confidence: AccurateRipConfidence) -> None:
+    def add_track(self, track_no: cd.TrackNr, crc1: AccurateRipTrackID1, crc2: AccurateRipTrackID2,
+                  confidence: AccurateRipConfidence
+                  ) -> None:
         if track_no < 1 or track_no > self.id.num_tracks:
             raise AccurateRipException(f"Invalid track number {track_no}")
         track_id = AccurateRipTrackID(crc1, crc2)
         self[track_no][track_id] = confidence
         return
 
+    def get_track_crc1(self, track_no: cd.TrackNr) -> List[Tuple[AccurateRipTrackID1, AccurateRipConfidence]]:
+        crcs = [(ar_id.crc1, confidence) for ar_id, confidence in self.__getitem__(track_no).items()]
+        return sorted(crcs, key=lambda x: x[1], reverse=True)
+
     def find_crc(self, track: int, crc: AccurateRipTrackID) -> Optional[AccurateRipConfidence]:
         try:
             return self[track][crc]
         except KeyError:
             return None
-
-    def find(self, track: int, track_id: AccurateRipTrackID) -> AccurateRipConfidence:
-        try:
-            return self[track][track_id]
-        except KeyError:
-            return 0
 
 
 @dataclass(frozen=True)
@@ -152,10 +156,13 @@ class AccurateRipTrackID:
 
 
 class AccurateRip:
-    #BINARY = PosixPath("/home/bas/NerdProjecten/cdrip/accuraterip/accuraterip")
+    # BINARY = PosixPath("/home/bas/NerdProjecten/cdrip/accuraterip/accuraterip")
     BINARY = PosixPath("/home/bas/pycharm/cdrip/accuraterip/accuraterip")
+    PREVIOUS_TRACK_FRAMES = (5880 // 2)
+    NEXT_TRACK_FRAMES = (5880 // 2)
 
     def __init__(self, disc: cd.Disc, wav_file: PathLike):
+        self._ar_results: Optional[AccurateRipResults] = None
         if not self.BINARY.exists():
             raise FileNotFoundError(f"Cannot find accuraterip binary at f{self.BINARY}")
         self._disc = disc
@@ -165,70 +172,112 @@ class AccurateRip:
     def offset(self) -> int:
         return self._disc.cdplayer.offset
 
-    @classmethod
-    def _run_binary(cls, args: List[str]) -> List[AccurateRipTrackID]:
-        result = tools.execcmd(cls.BINARY, args)
-        if result.returncode != 0:
-            raise AccurateRipException(f"Accuraterip run failed with code {result.returncode}: {result.stderr}")
+    @property
+    def ar_results(self) -> Optional[AccurateRipResults]:
+        if self._ar_results is None:
+            self.ar_lookup()
+        return self._ar_results
 
-        # now parse the stdout, expecting output like:
-        # track01 03:00:00.000   7938000 435cff30 140a7894
-        chksums: List[AccurateRipTrackID] = []
-        for line in result.stdout.splitlines():
-            (track, _, _, crc1_s, crc2_s) = line.split()
-            if not track.startswith("track"):
-                raise AccurateRipException(f"Could not parse accuraterip output: \n{result.stdout}")
-            crc1 = int(crc1_s, 16)
-            crc2 = int(crc2_s, 16)
-            chksums.append(AccurateRipTrackID(crc1, crc2))
+    def checksum_disc(self) -> Dict[cd.TrackNr, Dict[AccurateRipConfidence, AccurateRipTrackID1]]:
+        return self.checksum_disc_audiotools()
 
-        return chksums
+    def checksum_track(self, track: cd.Track) -> Dict[int, AccurateRipTrackID1]:
+        return self._checksum_track_audiotools(track)
 
-    def checksum(self, filename: PathLike,
-                 sample_start: Optional[int] = None,
-                 sample_num: Optional[int] = None) -> AccurateRipTrackID:
-        args = [str(filename)]
-        if sample_start is not None:
-            args += [f'{sample_start:d}s']
-        if sample_num is not None:
-            args += [f'{sample_num:d}s']
+    def _checksum_track_audiotools(self, track: cd.Track) -> Dict[int, AccurateRipTrackID1]:
+        file = audiotools.open(self._wav)
+        # just doublechecking
+        if not isinstance(file, audiotools.WaveAudio) \
+           or not file.supports_to_pcm() \
+           or file.channels() != 2 \
+           or file.sample_rate() != cd.CDA_SAMLES_PER_SEC \
+           or file.bits_per_sample() != cd.CDA_BITS_PER_SAMPLE:
+            raise AccurateRipException("Input file doesn't look like a CDA rip")
 
-        chksums = self._run_binary(args)
-        if len(chksums) > 1:
-            raise AccurateRipException(f"Found {len(chksums)} while expecting only 1")
+        # most of this is taken from https://github.com/tuffy/python-audio-tools/blob/master/trackverify#L244
+        reader = file.to_pcm()
+        if not hasattr(reader, "seek") or not callable(reader.seek):
+            raise AccurateRipException("Can't seek in file")
 
-        return chksums[0]
+        # we start reading a bit before the track, in order to try out different offsets for the accuraterip checksums
+        # the reader below will take care of padding if this is negative
+        offset = track.first_sample - self.PREVIOUS_TRACK_FRAMES
 
-    # get checksums for multiple tracks in a single file
-    # todo: make a proper object to describe the tracks
-    def checksum_multi(self, filename: PathLike,
-                       tracks: List[Tuple[int, int]], offset: int = 0) -> Dict[int, AccurateRipTrackID]:
-        if not Path(filename).exists():
-            raise FileNotFoundError(f"Audio file '{filename}' not found")
+        if offset > 0:
+            offset -= reader.seek(offset)
 
-        args = [str(filename)]
-        args += ["-o", offset]
-        args += ["{}s,{}s".format(*t) for t in tracks]
+        checksummer = audiotools.accuraterip.Checksum(
+            total_pcm_frames=track.length_samples,
+            sample_rate=cd.CDA_SAMLES_PER_SEC,
+            is_first=track.is_first,
+            is_last=track.is_last,
+            pcm_frame_range=self.PREVIOUS_TRACK_FRAMES + 1 + self.NEXT_TRACK_FRAMES,
+            accurateripv2_offset=self.PREVIOUS_TRACK_FRAMES
+        )
 
-        chksums = self._run_binary(args)
+        window_reader = audiotools.PCMReaderWindow(
+            reader, offset,
+            self.PREVIOUS_TRACK_FRAMES + track.length_samples + self.NEXT_TRACK_FRAMES
+        )
 
-        # return a 1-based list (real track numbers)
-        return {k+1: v for k, v in enumerate(chksums)}
+        audiotools.transfer_data(window_reader.read, checksummer.update)
 
-    def checksum_disc(self) -> List[AccurateRipTrackID]:
-        track_spec = [(t.first_sample, t.length_samples) for t in self._disc.tracks]
-        chksums = self.checksum_multi(self._wav, track_spec, self.offset)
-        return chksums
+        checksums_v1 = checksummer.checksums_v1()
 
-    def lookup(self) -> Optional[AccurateRipResults]:
+        crc1_by_offset: Dict[int, AccurateRipTrackID1] = {
+            i: AccurateRipTrackID1(c) for i, c in enumerate(checksums_v1, -self.PREVIOUS_TRACK_FRAMES)
+        }
+
+        return crc1_by_offset
+
+    def checksum_disc_audiotools(self) -> Dict[cd.TrackNr, Dict[AccurateRipConfidence, AccurateRipTrackID1]]:
+        results_by_track = {t.num: self.checksum_track(track=t) for t in self._disc.tracks}
+        return results_by_track
+
+    def ar_lookup(self) -> None:
         accuraterip_id = self._disc.id_accuraterip()
 
-        print(f"Fetching {accuraterip_id.url}")
+        #print(f"Fetching {accuraterip_id.url}")
+        print("  Looking up disc in accuraterip database... ", end='')
         response = urllib.request.urlopen(accuraterip_id.url)
-        if response.status != 200:
-            # TODO: sometimes this might e ok, and we jsut return None
-            raise AccurateRipException(f"Couldn't fetch accuraterip entry: {response.reason}")
-        ar_known = AccurateRipResults.parse_accuraterip_bin(response.read(), accuraterip_id)
-        print(ar_known)
+        if response.status == 200:
+            print("found!")
+            self._ar_results = AccurateRipResults.parse_accuraterip_bin(response.read(), accuraterip_id)
+        elif response.status == 404:
+            print("not found :(")
+            self._ar_results = None
+        else:
+            raise AccurateRipException(f"Couldn't fetch accuraterip entry: {response.status}: {response.reason}")
 
-        return ar_known
+    def find_confidence_track(self, track: cd.TrackNr) -> Tuple[AccurateRipConfidence, int]:
+        # list of (crc1,confidence) tuples
+        ar_crcs = self.ar_results.get_track_crc1(track)
+        # dict of {offset: crc1} pairs
+        track_crcs = self.checksum_track(self._disc.tracks[track-1])
+
+        for ar_crc1, confidence in ar_crcs:
+            for offset, track_crc in track_crcs.items():
+                if ar_crc1 == track_crc:
+                    return confidence, offset
+
+        return 0, 0
+
+    def find_confidence(self) -> Optional[Dict[cd.TrackNr, AccurateRipConfidence]]:
+        print("Matching disc with Acucuraterip database...")
+
+        if self.ar_results is None:
+            print("No accuraterip results found for disc")
+            return None
+
+        confidences: Dict[cd.TrackNr, AccurateRipConfidence] = dict()
+        for t in self._disc.track_nums():
+            confidence, offset = self.find_confidence_track(t)
+            confidences[t] = confidence
+
+            print(f"  - Track {t:-2d}: ", end="")
+            if confidence > 0:
+                print(f"found matching crc at offset {offset} with confidence {confidence}")
+            else:
+                print(f"no matching crc found for track {t}")
+
+        return confidences
