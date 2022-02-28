@@ -76,15 +76,18 @@ LSN = int
 
 
 # basic CD contants
+CDA_BITS_PER_SAMPLE:   Final[int] = 16
 CDA_SAMLES_PER_SEC:    Final[int] = 44100
 CDA_FRAMES_PER_SEC:    Final[int] = 75
 CDA_FRAMES_PER_MIN:    Final[int] = CDA_FRAMES_PER_SEC * 60
 CDA_SAMPLES_PER_FRAME: Final[int] = CDA_SAMLES_PER_SEC // CDA_FRAMES_PER_SEC
 CDA_PREGAP_FRAMES:     Final[int] = 150
 
+TrackNr = int
 
 # Note: LBA (logical block access) = absolute pos on disc (track 1 starts at lba=150)
 #       LSN (logical sector number) = number fo frames since audio start (start 1 start at lsn=0)
+
 
 def lba2msf(lba: LSN) -> MSF:
     m = lba // CDA_FRAMES_PER_MIN
@@ -164,8 +167,9 @@ class Track:
             return None
         raise TrackException(f"Unknown preemphasis value '{preemphasis}'")
 
-    def __init__(self, track: cdio.Track):
-        self.num: int = track.track
+    def __init__(self, track: cdio.Track, is_last: bool):
+        self.num: TrackNr = track.track
+        self.is_last_track: bool = is_last
         self.first_lba: LBA = track.get_lba()
         # TODO: this breaks for CDs with non-audio tracks
         #       get_last_lsn() is inplemented by looking at the start of the next track, but if that is a
@@ -202,6 +206,8 @@ class Track:
             "length": lba2msf(self.length),
             "first_sample": lba2sample(self.first_lba),
             "length_sample": lsn2sample(self.length),
+            "first_lsn": lba2lsn(self.first_lba),
+            "first_msf": lba2msf(self.first_lba)
         }
         return self.__dict__ | extra
 
@@ -221,6 +227,14 @@ class Track:
     def length_samples(self) -> int:
         return lsn2sample(self.length)
 
+    @property
+    def is_first(self) -> bool:
+        return self.num == 1
+
+    @property
+    def is_last(self) -> bool:
+        return self.is_last_track
+
 
 class Disc:
     def __init__(self, cdplayer: Optional[CDPlayer]):
@@ -229,7 +243,7 @@ class Disc:
         self.first_track: int = pycdio.get_first_track_num(device.cd)
         self.num_tracks: int = pycdio.get_last_track_num(device.cd)
         self.last_track: int = self.first_track + self.num_tracks - 1
-        self.tracks: List[Track] = [Track(device.get_track(t)) for t in self.track_nums()]
+        self.tracks: List[Track] = [Track(device.get_track(t), t == self.num_tracks) for t in self.track_nums()]
         self.cdtext: List[CDText_type] = self.parse_cdtext(pycdio.get_cdtext(device.cd))
         self.mcn: Optional[str] = self.get_mcn(device.cd)
         self.mode: DiscMode = DiscMode(pycdio.get_disc_mode(device.cd))

@@ -20,7 +20,9 @@
 from __future__ import annotations
 
 #import tocparser
-from os import PathLike
+import time
+from subprocess import Popen, PIPE, STDOUT
+from os import PathLike, system
 import os.path
 from typing import Union, Optional, List
 from pathlib import Path
@@ -31,12 +33,16 @@ from .accuraterip import AccurateRip
 from . import tools
 
 
+class AudioRipperException(Exception):
+    pass
+
+
 # this class handles the actual ripping from cd to audio file
 # all intermediate files are stored as raw 16-bit signed samples (at 44.1kHz)
-
 class AudioRipper:
     COMMANDS = {
         'cdrdao': Path('/usr/bin/cdrdao'),
+        'icedax': Path('/usr/bin/icedax'),
         'cdparanoia': Path('/usr/bin/cdparano1ia'),
         'sox': Path('/usr/bin/sox'),
     }
@@ -50,13 +56,11 @@ class AudioRipper:
         self._audio_file: Optional[Path] = None
         self._cue_file: Optional[Path] = None
 
+        self._destdir.mkdir(parents=True, exist_ok=True)
+
     @property
     def cd(self) -> cdplayer.CDPlayer:
         return self._cdplayer
-
-    #@property
-    #def disc(self) -> Disc:
-    #    return self._disc
 
     @property
     def cwd(self) -> Path:
@@ -66,22 +70,22 @@ class AudioRipper:
         return Path(self._destdir, name)
 
     def rip(self) -> None:
-        # https://github.com/thomasvs/morituri/blob/master/examples/readdisc.py./con
-        raw_file = self.rip_fast_fullcd()
-        wav_file = self.convert_to_wav()
+        wav_file = self.rip_icedax()
         accuraterip = AccurateRip(self._disc, wav_file)
-        chksums = accuraterip.checksum_disc()
-        ar_results = accuraterip.lookup()
-        for t in self._disc.track_nums():
-            confidence = ar_results.find(t, chksums[t])
-            print(f"track {t:02d}: disk {chksums[t]}, confidence {confidence}")
+        confidence = accuraterip.find_confidence()
+        if confidence is not None:
+            for track, conf in [(t, c) for t, c in confidence.items() if c < 10]:
+                print(accuraterip.ar_results)
+                print(f"Track {track} failed (confidence is {conf}, retrying")
+                raise AudioRipperException("Reripping tracks is not implemented yet")
+
         return
 
     def exec(self, command: str, args: List[str], cwd: Optional[PathLike] = None):
         if cwd is None:
             cwd = self.cwd
         cmd = self.COMMANDS[command]
-        process = tools.execcmd(cmd=cmd, args=args, cwd=cwd)
+        process = tools.execcmd(cmd=cmd, args=args, cwd=cwd, show_output=True)
         if process.returncode != 0:
             print(f"Woops, command '{cmd}' failed:")
             print(process.stderr)
@@ -89,24 +93,46 @@ class AudioRipper:
         print(process.stdout)
         print(process.stderr)
 
-    def rip_fast_fullcd(self) -> PathLike:
-        rawfile = self.path('cdrdao.raw')
-        self._cue_file = self.path('cdrdao.toc')
+    def rip_icedax(self) -> PathLike:
+        output_file = self.path('icedax.wav')
 
-        if os.path.exists(rawfile):
+        if os.path.exists(output_file):
             print("Rip exists, skipping")
-        else:
-            # cdrdao
-            self.exec('cdrdao', [
-                'read-cd',
-                '--datafile', 'cdrdao.raw',
-                '--paranoia-mode', '1',
-                '--device', self.cd.device_name,
-                'cdrdao.toc']
-            )
+            return output_file
 
-        #self._disc = Disc(self.path('cdrdao.toc'), self.path('cdrdao.raw'))
-        return self.path('cdrdao.raw')
+        args = [
+            self.COMMANDS['icedax'],
+            '-D', self.cd.device_name,
+            '--max', '--no-infofile',
+            '--output-format', 'wav',
+            '--track', f"{self.cd.firsttrack}+{self.cd.lasttrack}",
+            output_file
+        ]
+
+        print("Ripping disc using icedax:")
+
+        popen = Popen(args, cwd=self.cwd,
+                      stdout=PIPE, stderr=STDOUT, encoding='ascii', text=True, bufsize=0)
+
+        # produce some fancy output
+        current_track = 0
+        while popen.poll() is None:
+            line = popen.stdout.readline().rstrip()
+
+            if current_track > 0:
+                if "%" in line:
+                    print(f"\rTrack {current_track:-2d}/{self.cd.lasttrack}: {line}", end="")
+                if "recorded successfully" in line:
+                    print()
+
+            if line == 'percent_done:' or line.endswith("recorded successfully"):
+                current_track += 1
+
+        if popen.returncode != 0:
+            print("Error while ripping, cleaning up")
+            output_file.unlink(missing_ok=True)
+
+        return output_file
 
     def rip_accurate_track(self, track: int) -> PathLike:
         # cdparanoia
