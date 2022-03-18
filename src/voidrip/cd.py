@@ -214,6 +214,8 @@ class Disc:
         device = cdplayer.device
         self.first_track: int = pycdio.get_first_track_num(device.cd)
         self.num_tracks: int = pycdio.get_last_track_num(device.cd)
+        if self.first_track > 100 or self.num_tracks > 100:
+            raise DiscException(f"Invalid first {self.first_track} or last {self.num_tracks} track")
         self.last_track: int = self.first_track + self.num_tracks - 1
         self.tracks: List[Track] = [Track(device.get_track(t), t == self.num_tracks) for t in self.track_nums()]
         self.cdtext: List[CDText_type] = self.parse_cdtext(pycdio.get_cdtext(device.cd))

@@ -76,7 +76,7 @@ class CDPlayer:
         self._udev_context: pyudev.Context = pyudev.Context()
         self._udev_device: pyudev.Device = pyudev.Devices.from_device_file(self._udev_context, str(self._dev_path))
 
-        self._device: cdio.Device = cdio.Device(str(self._dev_path))
+        self._device: Optional[cdio.Device] = None
         self._cdinfo = None
 
         # sanity checks
@@ -104,6 +104,8 @@ class CDPlayer:
 
     @property
     def device(self) -> cdio.Device:
+        if self._device is None:
+            self._device = cdio.Device(str(self._dev_path))
         return self._device
 
     @property
@@ -156,19 +158,23 @@ class CDPlayer:
         udev_monitor = pyudev.Monitor.from_netlink(self._udev_context)
         udev_monitor.filter_by('block')
         for dev in iter(udev_monitor.poll, None):
-            #print(f"Notify for {dev.device_node} {type(dev.device_node)}")
             if self._dev_path == Path(dev.device_node) \
                and dev.properties.get('DISK_MEDIA_CHANGE') \
                and dev.properties.get('ID_CDROM_MEDIA_CD'):
+                time.sleep(0.1)
                 return
 
     def tray_open(self) -> None:
-        self.ioctl(CDPlayer.IOCTL['CDROM_LOCKDOOR'], 0)
-        self.ioctl(CDPlayer.IOCTL['CDROM_EJECT'], 0)
+        #self.ioctl(CDPlayer.IOCTL['CDROM_LOCKDOOR'], 0)
+        #self.ioctl(CDPlayer.IOCTL['CDROM_EJECT'], 0)
+        # Note: when we open the tray, the handle doesn't work anymore; we need to open it again when a disk is present
+        self.device.eject_media()
+        self._device = None
 
     def tray_close(self) -> None:
-        self.ioctl(CDPlayer.IOCTL['CDROM_LOCKDOOR'], 0)
-        self.ioctl(CDPlayer.IOCTL['CDROM_CLOSETRAY'], 0)
+        #self.ioctl(CDPlayer.IOCTL['CDROM_LOCKDOOR'], 0)
+        #self.ioctl(CDPlayer.IOCTL['CDROM_CLOSETRAY'], 0)
+        cdio.close_tray(str(self.device_name))
         for i in range(0, 195):
             if not self.is_open():
                 break
@@ -199,14 +205,14 @@ class CDPlayer:
 
     @property
     def firsttrack(self):
-        track_first = self._device.get_first_track().track
+        track_first = self.device.get_first_track().track
         if track_first != 1:
             raise CDPlayerException(f"First track is not 1 but `{track_first}'")
         return track_first
 
     @property
     def lasttrack(self):
-        return self._device.get_last_track().track
+        return self.device.get_last_track().track
 
     @property
     def tracks(self):
@@ -216,10 +222,10 @@ class CDPlayer:
         tracks = []
         for t in self.tracks:
             try:
-                track = self._device.get_track(t)
+                track = self.device.get_track(t)
             except Exception:
                 raise CDPlayerException(f"Failed to fetch track {t}")
-            tracks.append(Track(track))
+            tracks.append(Track(track, t == self.lasttrack))
         return tracks
 
     @property
@@ -230,13 +236,21 @@ class CDPlayer:
         return self._cdinfo
 
     def get_disc_mcn(self) -> Optional[str]:
-        mcn = self._device.get_mcn()
+        mcn = self.device.get_mcn()
         return mcn if mcn else None
 
     def get_track_info(self, track_num: int) -> Track:
-        track = self._device.get_track(track_num)
-        return Track(track)
+        track = self.device.get_track(track_num)
+        return Track(track, track_num == self.lasttrack)
 
-    def get_disc(self) -> cd.Disc:
-        disc = cd.Disc(self)
-        return disc
+    def get_disc(self, timeout: int = 30) -> cd.Disc:
+        while timeout > 0:
+            try:
+                disc = cd.Disc(self)
+                return disc
+            except cd.DiscException:
+                timeout -= 1
+                time.sleep(1.0)
+                continue
+
+        raise CDPlayerException("Can't read disc")

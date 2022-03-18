@@ -21,20 +21,21 @@ from __future__ import annotations
 
 #import tocparser
 import json
+#import subprocess
+#import time
 import subprocess
-import time
 from datetime import datetime
 from subprocess import Popen, PIPE, STDOUT
-from os import PathLike, system
+from os import PathLike
 import os.path
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Dict
 from pathlib import Path
 
 import pytz
 
 from . import cd
 from . import cdplayer
-from .accuraterip import AccurateRip
+from .accuraterip import AccurateRip, AccurateRipConfidence
 from . import tools
 
 
@@ -62,6 +63,7 @@ class AudioRipper:
         self.wav_file: Optional[Path] = None
         self.flac_file: Optional[Path] = None
         self.rip_date: datetime = datetime.now(pytz.timezone("Europe/Amsterdam")).replace(microsecond=0)
+        self.accuraterip_results: Optional[Dict[cd.TrackNr, AccurateRipConfidence]] = None
 
         self.destdir.mkdir(parents=True, exist_ok=True)
 
@@ -88,9 +90,21 @@ class AudioRipper:
                 print(accuraterip.ar_results)
                 print(f"Track {track} failed (confidence is {conf}, retrying")
                 raise AudioRipperException("Reripping tracks is not implemented yet")
+        self.accuraterip_results = confidence
         self.flac_file = self.convert_to_flac()
 
         return
+
+    def save(self, dest: Path, basename: Path) -> None:
+        if not dest.is_dir():
+            raise AudioRipperException(f"Destination '{dir}' for save is not a directory")
+        if list(dest.glob(str(basename)+"*")):
+            raise AudioRipperException(f"Destination id '{dest / basename}' already exists")
+
+        name = dest / basename
+        self.wav_file.rename(name.with_suffix(".flac"))
+        with open(name.with_suffix(".json"), "x") as fp:
+            fp.write(self.as_json())
 
     def exec(self, command: str, args: List[str], cwd: Optional[PathLike] = None):
         if cwd is None:
@@ -164,16 +178,16 @@ class AudioRipper:
 
         print("Converting image to flac")
 
-        popen = Popen(args, cwd=self.cwd,
-                      stdout=PIPE, stderr=STDOUT, encoding='ascii', text=True, bufsize=0)
-        #subprocess.run(args)
+        #popen = Popen(args, cwd=self.cwd,
+        #              stdout=PIPE, stderr=STDOUT, encoding='ascii', text=True, bufsize=0)
+        result = subprocess.run(args)
 
         # produce some fancy output
-        while popen.poll() is None:
-            chars = popen.stdout.read(8)
-            print(chars, end='')
+        #while popen.poll() is None:
+        #    chars = popen.stdout.read(8)
+        #    print(chars, end='')
 
-        if popen.returncode != 0:
+        if result.returncode != 0:
             print("Error while ripping, cleaning up")
             output_file.unlink(missing_ok=True)
 
