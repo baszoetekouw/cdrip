@@ -125,7 +125,7 @@ class RipStatus:
         return self.dir["status"] / "disc_ids.txt"
 
     def find_duplicates(self, disc: cd.Disc) -> Optional[List[str]]:
-        with filelock.FileLock(self.id_file.with_name(".lock")):
+        with filelock.FileLock(str(self.id_file.with_name(".lock"))):
             try:
                 with open(self.id_file) as fd:
                     csvfile = csv.reader(fd, delimiter=" ")
@@ -141,6 +141,12 @@ class RipStatus:
                     print(f"{self.name} {disc.id_musicbrainz()}", file=f)
                 return None
         return results
+
+    def save_id(self, disc: cd.Disc) -> None:
+        with filelock.FileLock(str(self.id_file.with_name(".lock"))):
+            with open(self.id_file, "a") as f:
+                print(f"{self.name} {disc.id_musicbrainz()}", file=f)
+        return None
 
 
 def rip_cd(options: Options) -> None:
@@ -170,6 +176,7 @@ def rip_cd(options: Options) -> None:
             return
     else:
         print("none found")
+    rip_status.save_id(disc)
 
     print("Starting rip")
     rip = voidrip.AudioRipper(disc, rip_status.work_dir_phase1)
