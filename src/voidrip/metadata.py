@@ -24,6 +24,8 @@ from pprint import pprint
 from . import cdplayer
 
 
+# zie https://kid3.sourceforge.io/kid3_en.html#apply-filename-format voor een lijst van mp3 tags
+
 class Metadata:
     def __init__(self, device):
         self._useragent = "VoidRippert", "0.1", "bas@zoetekouw.net"
