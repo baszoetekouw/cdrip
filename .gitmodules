@@ -1,0 +1,3 @@
+[submodule "accuraterip-checksum"]
+	path = accuraterip-checksum
+	url = git@github.com:baszoetekouw/accuraterip-checksum.git
