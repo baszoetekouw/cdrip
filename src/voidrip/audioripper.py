@@ -176,18 +176,30 @@ class AudioRipper:
             input_file
         ]
 
-        print("Converting image to flac")
+        print("Converting sound to flac")
 
-        #popen = Popen(args, cwd=self.cwd,
-        #              stdout=PIPE, stderr=STDOUT, encoding='ascii', text=True, bufsize=0)
-        result = subprocess.run(args)
+        popen = Popen(args, cwd=self.cwd,
+                      stdout=PIPE, stderr=STDOUT, encoding='ascii', text=True, bufsize=0)
+        #result = subprocess.run(args)
 
         # produce some fancy output
-        #while popen.poll() is None:
-        #    chars = popen.stdout.read(8)
-        #    print(chars, end='')
+        buf = ""
+        done = False
+        while not done:
+            try:
+                popen.communicate(timeout=0.1)
+                done = True
+            except TimeoutError:
+                pass
 
-        if result.returncode != 0:
+            buf += popen.stdout.read(4).rstrip("\b")
+
+            while buf.find("\b") > 0:
+                line, _, buf = buf.partition("\b")
+                buf = buf.lstrip("\b")
+                print(line, end="\r")
+
+        if popen.returncode != 0:
             print("Error while ripping, cleaning up")
             output_file.unlink(missing_ok=True)
 
