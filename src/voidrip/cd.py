@@ -15,6 +15,8 @@ from .tools import AudioRipperJSONEncoder
 if typing.TYPE_CHECKING:
     from . import CDPlayer
 
+import chardet
+
 #import tocparser
 import pycdio
 import cdio
@@ -58,7 +60,8 @@ class DiscMode(enum.Enum):
     CD_I       = "CD-i"
 
 
-CDText_type = Dict[str, Union[str, Dict]]
+# TODO: make this a dataclass
+CDText_type = Dict[str, Union[str, Dict[int, Dict[str,  bytes]]]]
 
 
 # types for cd timings
@@ -333,3 +336,21 @@ class Disc:
         id3 = int(self.id_cddb(), 16)
 
         return AccurateRipID(self.num_tracks, id1, id2, id3)
+
+    def get_performer_title(self) -> tuple[Optional[str], Optional[str]]:
+        title, artist = (None, None)
+        for cdtext in self.cdtext:
+            if "data" in cdtext and len(cdtext["data"]) > 0:
+                if "PERFORMER" in cdtext["data"][0]:
+                    artist = cdtext["data"][0]["PERFORMER"]
+                if "TITLE" in cdtext["data"][0]:
+                    title = cdtext["data"][0]["TITLE"]
+
+        if artist:
+            charset = chardet.detect(artist)
+            artist = artist.decode(charset["encoding"])
+        if title:
+            charset = chardet.detect(title)
+            title = title.decode(charset["encoding"])
+
+        return artist, title

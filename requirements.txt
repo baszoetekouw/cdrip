@@ -9,3 +9,5 @@ git+https://github.com/rocky/pycdio@master#egg=pycdio
 #git+https://github.com/cmlburnett/tocparser
 pytz>=2021.3
 filelock~=3.6.0
+
+chardet~=5.1.0

@@ -12,6 +12,7 @@ from enum import Enum
 from pprint import pprint
 from typing import Optional, List
 import csv
+import readline # for input
 
 import filelock
 
@@ -26,6 +27,9 @@ from voidrip import cd
 @dataclass
 class Options:
     cdrom: Path
+
+
+readline.read_init_file()
 
 
 def parse_args() -> Options:
@@ -64,8 +68,9 @@ class RipStatus:
         for p in self.dir.values():
             p.mkdir(parents=True, exist_ok=True)
         self._id: int = self.register_next_id()
-        self._status : RipStatusCode = RipStatusCode.INITIALIZING
         self._work_dir = self.create_dir_phase1(cdplayer.device_name)
+
+        self.write_statusfile(status=RipStatusCode.INITIALIZING)
 
     @staticmethod
     def id_to_name(id_num: int) -> Path:
@@ -77,7 +82,7 @@ class RipStatus:
             filename = self.dir["status"] / self.id_to_name(num).with_suffix(".status")
             try:
                 with open(filename, "x") as statusfile:
-                    statusfile.write(RipStatusCode.INITIALIZING.name)
+                    statusfile.write("")
                 return num
             except FileExistsError:
                 num += 1
@@ -98,21 +103,58 @@ class RipStatus:
 
     @property
     def status_file(self) -> Path:
-        return self.dir["status"] / self.name
+        return self.dir["status"] / self.name.with_suffix(".status")
+
+    def read_statusfile(self) -> tuple[RipStatusCode, Optional[str], Optional[str]]:
+        try:
+            with open(self.status_file, "r") as statusfile:
+                s = statusfile.readline().rstrip()
+                status = RipStatusCode[s] if s else None
+                artist = statusfile.readline().rstrip()
+                album = statusfile.readline().rstrip()
+        except ValueError:
+            raise Exception(f"Invalid status '{s}' in {self.status_file}")
+
+        if artist == '':
+            artist = None
+        if album == '':
+            album = None
+
+        return status, artist, album
+
+    def write_statusfile(self, status: Optional[RipStatusCode] = None,
+                         artist: Optional[str] = None, album: Optional[str] = None) -> None:
+        try:
+            old_status, old_artist, old_album = self.read_statusfile()
+        except FileNotFoundError:
+            old_status, old_artist, old_album = (RipStatusCode.INITIALIZING, None, None)
+
+        new_status = status if status else old_status
+        new_artist = artist if artist else old_artist
+        new_album  = album  if album  else old_album
+
+        with open(self.status_file, "w") as statusfile:
+            print(new_status.name, file=statusfile)
+            print(new_artist if new_artist else '', file=statusfile)
+            print(new_album  if new_album  else '', file=statusfile)
+
+        return
 
     @property
     def status(self) -> RipStatusCode:
-        with open(self.status_file, "r") as statusfile:
-            s = statusfile.readline().rstrip()
-            try:
-                return RipStatusCode(s)
-            except ValueError:
-                raise Exception(f"Invalid status '{s}' in {self.status_file}")
+        status, _, _ = self.read_statusfile()
+        return status
 
     @status.setter
     def status(self, status: RipStatusCode) -> None:
-        with open(self.status_file, "x") as statusfile:
-            statusfile.write(status.name)
+        self.write_statusfile(status=status)
+
+    def get_artist_album(self) -> tuple[Optional[str], Optional[str]]:
+        _, artist, album = self.read_statusfile()
+        return artist, album
+
+    def set_artist_album(self, artist: Optional[str] = None, album: Optional[str] = None) -> None:
+        self.write_statusfile(artist=artist, album=album)
 
     @property
     def work_dir_phase1(self):
@@ -149,6 +191,18 @@ class RipStatus:
         return None
 
 
+def input_yes_no(prompt: str, default = True) -> bool:
+    answer = input(prompt)
+    if len(answer) == 0:
+        return default
+    first =  answer.lower()[0]
+    if first=='y' or first=='j':
+        return True
+    if first=='n':
+        return False
+    return default
+
+
 def rip_cd(options: Options) -> None:
     print(f"using cdrom {options.cdrom}")
 
@@ -167,16 +221,29 @@ def rip_cd(options: Options) -> None:
 
     print("Reading TOC")
     disc = cdplayer.get_disc()
+    pprint(disc)
 
     print("Looking for duplicates...", end="")
     if duplicates := rip_status.find_duplicates(disc):
         print(f"\nThis disc seems to have been ripped already as {','.join(duplicates)}")
-        answer = input("Do you wish to continue?")
-        if answer.lower().startswith("n"):
+        answer = input_yes_no("Do you wish to continue? (no) ", default=False)
+        if not answer:
             return
     else:
         print("none found")
     rip_status.save_id(disc)
+
+    artist, album = disc.get_performer_title()
+    if artist and album:
+        answer = input_yes_no(f"CD claims to be `{album}` by `{artist}`, is dat correct? (yes) ", default=True)
+        if not answer:
+            artist, album = (None, None)
+    # get user input, if necessary
+    if not (artist and album):
+        print("Please input Artist and Album title manually; this will not be used in actual metadata.")
+        artist = input("Artist: ")
+        album = input("Album title: ")
+    rip_status.set_artist_album(artist=artist, album=album)
 
     print("Starting rip")
     rip = voidrip.AudioRipper(disc, rip_status.work_dir_phase1)
