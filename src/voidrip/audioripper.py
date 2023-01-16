@@ -180,26 +180,58 @@ class AudioRipper:
 
         popen = Popen(args, cwd=self.cwd,
                       stdout=PIPE, stderr=STDOUT, encoding='ascii', text=True, bufsize=0)
-        #result = subprocess.run(args)
 
         # produce some fancy output
+        # flac produces annoying output, including a non-removable preamble.
+        # and a progress indicator that overwrites itself by backspacing over the old text
+        # like this:
+        # ╰─▶ flac -6 --output-name=icedax.flac -f cdrdao.wav|& xxd
+        # 00000000: 0a66 6c61 6320 312e 342e 320a 436f 7079  .flac 1.4.2.Copy
+        # 00000010: 7269 6768 7420 2843 2920 3230 3030 2d32  right (C) 2000-2
+        # 00000020: 3030 3920 204a 6f73 6820 436f 616c 736f  009  Josh Coalso
+        # 00000030: 6e2c 2032 3031 312d 3230 3232 2020 5869  n, 2011-2022  Xi
+        # 00000040: 7068 2e4f 7267 2046 6f75 6e64 6174 696f  ph.Org Foundatio
+        # 00000050: 6e0a 666c 6163 2063 6f6d 6573 2077 6974  n.flac comes wit
+        # 00000060: 6820 4142 534f 4c55 5445 4c59 204e 4f20  h ABSOLUTELY NO
+        # 00000070: 5741 5252 414e 5459 2e20 2054 6869 7320  WARRANTY.  This
+        # 00000080: 6973 2066 7265 6520 736f 6674 7761 7265  is free software
+        # 00000090: 2c20 616e 6420 796f 7520 6172 650a 7765  , and you are.we
+        # 000000a0: 6c63 6f6d 6520 746f 2072 6564 6973 7472  lcome to redistr
+        # 000000b0: 6962 7574 6520 6974 2075 6e64 6572 2063  ibute it under c
+        # 000000c0: 6572 7461 696e 2063 6f6e 6469 7469 6f6e  ertain condition
+        # 000000d0: 732e 2020 5479 7065 2060 666c 6163 2720  s.  Type `flac'
+        # 000000e0: 666f 7220 6465 7461 696c 732e 0a0a 6364  for details...cd
+        # 000000f0: 7264 616f 2e77 6176 3a20 3125 2063 6f6d  rdao.wav: 1% com
+        # 00000100: 706c 6574 652c 2072 6174 696f 3d31 2e30  plete, ratio=1.0
+        # 00000110: 3033 0808 0808 0808 0808 0808 0808 0808  03..............
+        # 00000120: 0808 0808 0808 0808 0808 3225 2063 6f6d  ..........2% com
+        # 00000130: 706c 6574 652c 2072 6174 696f 3d31 2e30  plete, ratio=1.0
+        #
+        # parse this, so we only output "\r34% complete"
         buf = ""
-        done = False
-        while not done:
-            try:
-                popen.communicate(timeout=0.1)
-                done = True
-            except TimeoutError:
-                pass
+        output_enable = False
+        while popen.poll() is None:
+            # make sure to read less then 1 line per iteration here.
+            buf += popen.stdout.read(32)
 
-            buf += popen.stdout.read(4).rstrip("\b")
+            # remove preamble
+            if buf.find(": ") > 0:
+                _, _, buf = buf.partition(": ")
+                output_enable = True
 
-            while buf.find("\b") > 0:
-                line, _, buf = buf.partition("\b")
-                buf = buf.lstrip("\b")
-                print(line, end="\r")
+            if output_enable:
+                # make sure we don't end with backspace, because then the partition won't work
+                if buf.rfind("\b") != len(buf):
+                    line, _, buf = buf.rpartition("\b")
+                    # note that line cannot be multple lines because we read less than a full line per iteration
+                    if line:
+                        line = line.strip(" \b")
+                        print(f"\r{line}", end="", flush=True)
+
+        print()
 
         if popen.returncode != 0:
+        # if result.returncode != 0:
             print("Error while ripping, cleaning up")
             output_file.unlink(missing_ok=True)
 
