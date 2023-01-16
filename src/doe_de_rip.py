@@ -12,7 +12,7 @@ from enum import Enum
 from pprint import pprint
 from typing import Optional, List
 import csv
-import readline # for input
+import readline  # for input
 
 import filelock
 
@@ -191,14 +191,14 @@ class RipStatus:
         return None
 
 
-def input_yes_no(prompt: str, default = True) -> bool:
+def input_yes_no(prompt: str, default=True) -> bool:
     answer = input(prompt)
     if len(answer) == 0:
         return default
-    first =  answer.lower()[0]
-    if first=='y' or first=='j':
+    first = answer.lower()[0]
+    if first == 'y' or first == 'j':
         return True
-    if first=='n':
+    if first == 'n':
         return False
     return default
 
@@ -235,7 +235,7 @@ def rip_cd(options: Options) -> None:
 
     artist, album = disc.get_performer_title()
     if artist and album:
-        answer = input_yes_no(f"CD claims to be `{album}` by `{artist}`, is dat correct? (yes) ", default=True)
+        answer = input_yes_no(f"CD claims to be `{album}` by `{artist}`, is that correct? (yes) ", default=True)
         if not answer:
             artist, album = (None, None)
     # get user input, if necessary
@@ -264,7 +264,7 @@ def main():
     while True:
         rip_cd(options)
 
-    return
+    # return
 
 
 if __name__ == '__main__':

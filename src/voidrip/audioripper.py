@@ -19,24 +19,21 @@
 
 from __future__ import annotations
 
-#import tocparser
 import json
-#import subprocess
-#import time
-import subprocess
-from datetime import datetime
-from subprocess import Popen, PIPE, STDOUT
-from os import PathLike
+import os
 import os.path
-from typing import Union, Optional, List, Dict
+from datetime import datetime
+from os import PathLike
 from pathlib import Path
+from subprocess import Popen, PIPE, STDOUT
+from typing import Union, Optional, List, Dict
 
 import pytz
 
 from . import cd
 from . import cdplayer
-from .accuraterip import AccurateRip, AccurateRipConfidence
 from . import tools
+from .accuraterip import AccurateRip, AccurateRipConfidence
 
 
 class AudioRipperException(Exception):
@@ -211,7 +208,7 @@ class AudioRipper:
         buf = ""
         output_enable = False
         while popen.poll() is None:
-            # make sure to read less then 1 line per iteration here.
+            # make sure to read less than 1 line per iteration here.
             buf += popen.stdout.read(32)
 
             # remove preamble
